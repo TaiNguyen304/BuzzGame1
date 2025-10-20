@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Contestant</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #eef;
+      text-align: center;
+      padding: 20px;
+    }
+
+    input,
+    textarea {
+      padding: 10px;
+      margin: 5px;
+      font-size: 16px;
+    }
+
+    textarea {
+      width: 80%;
+      max-width: 400px;
+      height: 60px;
+      resize: none;
+      margin-bottom: 10px;
+    }
+
+    button {
+      cursor: pointer;
+      border-radius: 6px;
+      color: white;
+      border: none;
+      font-weight: bold;
+    }
+
+    #gameArea {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 20px;
+    }
+
+    #btnJoin {
+      background: #ff00cc;
+      color: white;
+      font-weight: bold;
+      height: 40px;
+      margin-left: 5px;
+      margin-right: 5px;
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+
+    #btnJoin:hover {
+      background: orange;
+    }
+
+    #btnSend,
+    #btnBuzz {
+      width: 80%;
+      width: 800px;
+      height: 75px;
+      margin-top: 5px;
+      margin-bottom: 5px;
+      font-size: 18px;
+    }
+
+    #btnSend {
+      background: purple;
+    }
+
+    #btnSend:hover {
+      background: orange;
+    }
+
+    #btnBuzz {
+      background: red;
+    }
+
+    #btnBuzz:hover {
+      background: orange;
+    }
+
+    #popupMessage {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: green;
+      color: white;
+      padding: 15px 30px;
+      border-radius: 5px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.5s, top 0.5s;
+      font-weight: bold;
+    }
+
+    .error {
+      background-color: red;
+      color: white;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Thí sinh</h1>
+  <input id="roomCode" placeholder="Mã phòng (6 chữ số)">
+  <input id="name" placeholder="Tên của bạn">
+  <button id="btnJoin">Xác nhận</button>
+
+  <div id="gameArea">
+    <textarea id="answer" placeholder="Nhập đáp án..."></textarea>
+    <button id="btnSend">Gửi đáp án</button>
+    <button id="btnBuzz">Bấm chuông</button>
+  </div>
+
+  <div id="popupMessage"></div>
+
+  <script type="module">
+    // Import the functions you need from the SDKs you need
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
+    // TODO: Add SDKs for Firebase products that you want to use
+    // https://firebase.google.com/docs/web/setup#available-libraries
+
+    // Your web app's Firebase configuration
+    // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+    const firebaseConfig = {
+      apiKey: "AIzaSyAKTVuijDV4QfHjDcnEau2w9MaRL9YduEQ",
+      authDomain: "buzz-game-7c91c.firebaseapp.com",
+      projectId: "buzz-game-7c91c",
+      storageBucket: "buzz-game-7c91c.firebasestorage.app",
+      messagingSenderId: "946217092381",
+      appId: "1:946217092381:web:d81064145965fb151acdf4",
+      measurementId: "G-C7KG9KSJ9C"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const db = firebase.database();
+
+    let roomRef, userId, startTime = null;
+    let lockedAnswer = true;
+    let lockedBuzz = true;
+    let hasBuzzed = false;
+
+    function showPopup(message, type = 'success') {
+      const popup = document.getElementById('popupMessage');
+      popup.innerText = message;
+      if (type === 'error') popup.classList.add('error');
+      else popup.classList.remove('error');
+
+      popup.style.transition = 'none';
+      popup.style.opacity = '0';
+      popup.style.top = '20px';
+      void popup.offsetHeight;
+
+      popup.style.transition = 'opacity 0.5s, top 0.5s';
+      popup.style.opacity = '1';
+      popup.style.top = '40px';
+      setTimeout(() => {
+        popup.style.opacity = '0';
+        popup.style.top = '20px';
+      }, 3000);
+    }
+
+    document.getElementById('btnJoin').onclick = () => {
+      const code = document.getElementById('roomCode').value.trim();
+      const name = document.getElementById('name').value.trim();
+
+      if (!code || !name) return showPopup("Vui lòng nhập Mã phòng và Tên.", 'error');
+      if (code.length !== 6 || isNaN(code)) return showPopup("Mã phòng phải là 6 chữ số.", 'error');
+
+      userId = 'u_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+      roomRef = db.ref('rooms/' + code);
+
+      roomRef.once('value', snap => {
+        if (snap.exists()) {
+          document.getElementById('gameArea').style.display = 'flex';
+          document.getElementById('roomCode').disabled = true;
+          document.getElementById('name').disabled = true;
+          document.getElementById('btnJoin').disabled = true;
+          showPopup("Kết nối thành công với phòng " + code + ".");
+
+          // Theo dõi trạng thái host
+          roomRef.child('lockedAnswer').on('value', s => {
+            lockedAnswer = s.val();
+            if (!lockedAnswer) {
+              startTime = Date.now();
+              showPopup("Host đã MỞ đáp án. Bạn có thể gửi đáp án!");
+            } else {
+              showPopup("Host đã KHÓA đáp án!", 'error');
+            }
+          });
+
+          roomRef.child('lockedBuzz').on('value', s => {
+            lockedBuzz = s.val();
+            if (!lockedBuzz) {
+              hasBuzzed = false;
+              showPopup("Host đã MỞ chuông. Bạn có thể bấm chuông!");
+            } else {
+              showPopup("Host đã KHÓA chuông!", 'error');
+            }
+          });
+
+          // Reset chuông
+          roomRef.child('buzzOrder').on('value', snap => {
+            if (snap.val() === null || snap.val().length === 0) hasBuzzed = false;
+          });
+        } else {
+          showPopup("Mã phòng không hợp lệ hoặc Host chưa tạo phòng này.", 'error');
+          roomRef = null;
+        }
+      });
+    };
+
+    document.getElementById('btnSend').onclick = () => {
+      if (!roomRef) return showPopup("Vui lòng tham gia phòng trước.", 'error');
+      if (lockedAnswer) return showPopup("Hiện tại chưa thể gửi đáp án!", 'error');
+
+      const answer = document.getElementById('answer').value.trim();
+      if (!answer) return showPopup("Vui lòng nhập đáp án trước khi gửi.", 'error');
+
+      const timeElapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+      roomRef.child('answers/' + userId).set({
+        name: document.getElementById('name').value,
+        answer: answer,
+        ts: Date.now()
+      });
+      showPopup(`Đã gửi đáp án "${answer}" vào lúc ${timeElapsed}s.`);
+    };
+
+    document.getElementById('btnBuzz').onclick = () => {
+      if (!roomRef) return showPopup("Vui lòng tham gia phòng trước.", 'error');
+      if (lockedBuzz) return showPopup("Hiện tại chưa thể bấm chuông!", 'error');
+      if (hasBuzzed) return showPopup("Bạn đã bấm chuông rồi!", 'error');
+
+      hasBuzzed = true;
+      roomRef.child('buzzOrder').push({
+        userId,
+        name: document.getElementById('name').value,
+        ts: Date.now()
+      });
+      showPopup("Bấm chuông thành công!");
+    };
+  </script>
+</body>
+
+</html>
