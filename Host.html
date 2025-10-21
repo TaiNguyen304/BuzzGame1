@@ -193,11 +193,10 @@
   <div id="popupMessage"></div>
 
   <script type="module">
-    // Import các hàm cần thiết từ Firebase Modular SDK
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
-    // *** ĐÃ SỬ DỤNG HOÀN TOÀN MODULAR API CHO DATABASE ***
-    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-database.js";
+    // *** Cập nhật Import sang phiên bản ổn định (v10.0.0) ***
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-analytics.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
 
     // Your web app's Firebase configuration
     const firebaseConfig = {
@@ -248,14 +247,14 @@
     // Hàm khóa đáp án (sử dụng set() Modular API)
     function lockAnswers() {
       if (!roomRef) return;
-      set(ref(roomRef, 'lockedAnswer'), true).then(() => {
-        showPopup("Đã khóa đáp án.");
-      }).catch(e => showPopup("Lỗi khóa đáp án. Kiểm tra Rules Firebase.", "error")); // Thêm catch lỗi
-      
+      // Đảm bảo clearTimeout được gọi trước khi set Firebase
       if (answerTimeout) {
         clearTimeout(answerTimeout);
         answerTimeout = null;
       }
+      set(ref(roomRef, 'lockedAnswer'), true).then(() => {
+        showPopup("Đã khóa đáp án.");
+      }).catch(e => showPopup("Lỗi khóa đáp án. Kiểm tra Rules Firebase.", "error"));
     }
 
     // Hàm mở đáp án theo thời gian (sử dụng set() Modular API)
@@ -292,7 +291,7 @@
         if (!roomRef) return; 
         set(ref(roomRef, 'lockedAnswer'), true).then(() => {
           showPopup("Hết giờ. Đáp án đã tự động khóa.");
-        }).catch(e => showPopup("Lỗi tự động khóa. Kiểm tra Rules Firebase.", "error")); // Thêm catch lỗi
+        }).catch(e => showPopup("Lỗi tự động khóa. Kiểm tra Rules Firebase.", "error"));
         answerTimeout = null; 
       }, durationSeconds * 1000); 
     }
@@ -375,7 +374,8 @@
         const list = snap.val() || [];
         const ol = document.getElementById('buzzList');
         ol.innerHTML = '';
-        Object.values(list).forEach(x => {
+        // Đảm bảo lặp qua các giá trị, vì Firebase có thể trả về Object nếu dùng push
+        Object.values(list).forEach(x => { 
           const li = document.createElement('li');
           li.innerText = x.name + ' (' + new Date(x.ts).toLocaleTimeString() + ')';
           ol.appendChild(li);

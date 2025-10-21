@@ -122,11 +122,10 @@
   <div id="popupMessage"></div>
 
   <script type="module">
-    // Import các hàm cần thiết từ Modular SDK
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
-    // Thêm các hàm Modular cho Realtime Database: getDatabase, ref, onValue, set, get, push
-    import { getDatabase, ref, onValue, set, get, child, push } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-database.js";
+    // *** Cập nhật Import sang phiên bản ổn định (v10.0.0) ***
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-analytics.js";
+    import { getDatabase, ref, onValue, set, get, push } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
 
 
     // Your web app's Firebase configuration
@@ -143,7 +142,6 @@
     // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const analytics = getAnalytics(app);
-    // *** Sửa lỗi: Khởi tạo db bằng Modular API ***
     const db = getDatabase(app);
 
     let roomRef, userId, startTime = null;
@@ -179,10 +177,8 @@
       if (code.length !== 6 || isNaN(code)) return showPopup("Mã phòng phải là 6 chữ số.", 'error');
 
       userId = 'u_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-      // *** Sửa lỗi: Tạo roomRef bằng Modular API ref(db, 'path') ***
       roomRef = ref(db, 'rooms/' + code);
 
-      // *** Sửa lỗi: Đọc dữ liệu một lần bằng get(roomRef) ***
       get(roomRef).then(snap => {
         if (snap.exists()) {
           document.getElementById('gameArea').style.display = 'flex';
@@ -191,7 +187,6 @@
           document.getElementById('btnJoin').disabled = true;
           showPopup("Kết nối thành công với phòng " + code + ".");
 
-          // *** Sửa lỗi: Theo dõi trạng thái bằng Modular API onValue(ref(roomRef, 'path')) ***
           onValue(ref(roomRef, 'lockedAnswer'), s => {
             lockedAnswer = s.val();
             if (!lockedAnswer) {
@@ -202,7 +197,6 @@
             }
           });
 
-          // *** Sửa lỗi: Theo dõi trạng thái bằng Modular API onValue(ref(roomRef, 'path')) ***
           onValue(ref(roomRef, 'lockedBuzz'), s => {
             lockedBuzz = s.val();
             if (!lockedBuzz) {
@@ -213,10 +207,10 @@
             }
           });
 
-          // *** Sửa lỗi: Theo dõi trạng thái bằng Modular API onValue(ref(roomRef, 'path')) ***
           onValue(ref(roomRef, 'buzzOrder'), snap => {
             // Logic reset chuông: nếu danh sách trống thì cho phép bấm lại
-            if (snap.val() === null || Object.keys(snap.val()).length === 0) {
+            const list = snap.val();
+            if (list === null || Object.keys(list).length === 0) {
               hasBuzzed = false;
             }
           });
@@ -238,12 +232,11 @@
       if (!answer) return showPopup("Vui lòng nhập đáp án trước khi gửi.", 'error');
 
       const timeElapsed = ((Date.now() - startTime) / 1000).toFixed(2);
-      // *** Sửa lỗi: Gửi dữ liệu bằng Modular API set(ref(roomRef, 'path'), data) ***
       set(ref(roomRef, 'answers/' + userId), {
         name: document.getElementById('name').value,
         answer: answer,
         ts: Date.now()
-      });
+      }).catch(e => showPopup("Lỗi gửi đáp án. Kiểm tra Rules Firebase.", "error")); // Thêm catch lỗi
       showPopup(`Đã gửi đáp án "${answer}" vào lúc ${timeElapsed}s.`);
     };
 
@@ -253,12 +246,11 @@
       if (hasBuzzed) return showPopup("Bạn đã bấm chuông rồi!", 'error');
 
       hasBuzzed = true;
-      // *** Sửa lỗi: Gửi dữ liệu bằng Modular API push(ref(roomRef, 'path'), data) ***
       push(ref(roomRef, 'buzzOrder'), {
         userId,
         name: document.getElementById('name').value,
         ts: Date.now()
-      });
+      }).catch(e => showPopup("Lỗi bấm chuông. Kiểm tra Rules Firebase.", "error")); // Thêm catch lỗi
       showPopup("Bấm chuông thành công!");
     };
   </script>
