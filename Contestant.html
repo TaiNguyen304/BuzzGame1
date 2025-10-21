@@ -122,14 +122,14 @@
   <div id="popupMessage"></div>
 
   <script type="module">
-    // Import the functions you need from the SDKs you need
+    // Import các hàm cần thiết từ Modular SDK
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
-    // TODO: Add SDKs for Firebase products that you want to use
-    // https://firebase.google.com/docs/web/setup#available-libraries
+    // Thêm các hàm Modular cho Realtime Database: getDatabase, ref, onValue, set, get, push
+    import { getDatabase, ref, onValue, set, get, child, push } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-database.js";
+
 
     // Your web app's Firebase configuration
-    // For Firebase JS SDK v7.20.0 and later, measurementId is optional
     const firebaseConfig = {
       apiKey: "AIzaSyAKTVuijDV4QfHjDcnEau2w9MaRL9YduEQ",
       authDomain: "buzz-game-7c91c.firebaseapp.com",
@@ -143,7 +143,8 @@
     // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const analytics = getAnalytics(app);
-    const db = firebase.database();
+    // *** Sửa lỗi: Khởi tạo db bằng Modular API ***
+    const db = getDatabase(app);
 
     let roomRef, userId, startTime = null;
     let lockedAnswer = true;
@@ -178,9 +179,11 @@
       if (code.length !== 6 || isNaN(code)) return showPopup("Mã phòng phải là 6 chữ số.", 'error');
 
       userId = 'u_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-      roomRef = db.ref('rooms/' + code);
+      // *** Sửa lỗi: Tạo roomRef bằng Modular API ref(db, 'path') ***
+      roomRef = ref(db, 'rooms/' + code);
 
-      roomRef.once('value', snap => {
+      // *** Sửa lỗi: Đọc dữ liệu một lần bằng get(roomRef) ***
+      get(roomRef).then(snap => {
         if (snap.exists()) {
           document.getElementById('gameArea').style.display = 'flex';
           document.getElementById('roomCode').disabled = true;
@@ -188,8 +191,8 @@
           document.getElementById('btnJoin').disabled = true;
           showPopup("Kết nối thành công với phòng " + code + ".");
 
-          // Theo dõi trạng thái host
-          roomRef.child('lockedAnswer').on('value', s => {
+          // *** Sửa lỗi: Theo dõi trạng thái bằng Modular API onValue(ref(roomRef, 'path')) ***
+          onValue(ref(roomRef, 'lockedAnswer'), s => {
             lockedAnswer = s.val();
             if (!lockedAnswer) {
               startTime = Date.now();
@@ -199,7 +202,8 @@
             }
           });
 
-          roomRef.child('lockedBuzz').on('value', s => {
+          // *** Sửa lỗi: Theo dõi trạng thái bằng Modular API onValue(ref(roomRef, 'path')) ***
+          onValue(ref(roomRef, 'lockedBuzz'), s => {
             lockedBuzz = s.val();
             if (!lockedBuzz) {
               hasBuzzed = false;
@@ -209,14 +213,20 @@
             }
           });
 
-          // Reset chuông
-          roomRef.child('buzzOrder').on('value', snap => {
-            if (snap.val() === null || snap.val().length === 0) hasBuzzed = false;
+          // *** Sửa lỗi: Theo dõi trạng thái bằng Modular API onValue(ref(roomRef, 'path')) ***
+          onValue(ref(roomRef, 'buzzOrder'), snap => {
+            // Logic reset chuông: nếu danh sách trống thì cho phép bấm lại
+            if (snap.val() === null || Object.keys(snap.val()).length === 0) {
+              hasBuzzed = false;
+            }
           });
         } else {
           showPopup("Mã phòng không hợp lệ hoặc Host chưa tạo phòng này.", 'error');
           roomRef = null;
         }
+      }).catch(error => {
+        console.error("Lỗi khi kết nối:", error);
+        showPopup("Lỗi kết nối Firebase. Vui lòng kiểm tra console.", 'error');
       });
     };
 
@@ -228,7 +238,8 @@
       if (!answer) return showPopup("Vui lòng nhập đáp án trước khi gửi.", 'error');
 
       const timeElapsed = ((Date.now() - startTime) / 1000).toFixed(2);
-      roomRef.child('answers/' + userId).set({
+      // *** Sửa lỗi: Gửi dữ liệu bằng Modular API set(ref(roomRef, 'path'), data) ***
+      set(ref(roomRef, 'answers/' + userId), {
         name: document.getElementById('name').value,
         answer: answer,
         ts: Date.now()
@@ -242,7 +253,8 @@
       if (hasBuzzed) return showPopup("Bạn đã bấm chuông rồi!", 'error');
 
       hasBuzzed = true;
-      roomRef.child('buzzOrder').push({
+      // *** Sửa lỗi: Gửi dữ liệu bằng Modular API push(ref(roomRef, 'path'), data) ***
+      push(ref(roomRef, 'buzzOrder'), {
         userId,
         name: document.getElementById('name').value,
         ts: Date.now()
