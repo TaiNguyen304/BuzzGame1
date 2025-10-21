@@ -196,7 +196,7 @@
     // Import các hàm cần thiết từ Firebase Modular SDK
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-analytics.js";
-    // *** Đã thêm các hàm Modular cho Realtime Database: getDatabase, ref, set, onValue ***
+    // *** ĐÃ SỬ DỤNG HOÀN TOÀN MODULAR API CHO DATABASE ***
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-database.js";
 
     // Your web app's Firebase configuration
@@ -214,9 +214,9 @@
     const app = initializeApp(firebaseConfig);
     const analytics = getAnalytics(app);
 
-    // *** Khởi tạo Database sử dụng Modular API: getDatabase(app) ***
+    // Khởi tạo Database sử dụng Modular API
     const db = getDatabase(app);
-    let roomRef; // roomRef sẽ là đối tượng Reference từ Modular API
+    let roomRef; 
     let currentRoomCode = null;
     let answerTimeout = null;
 
@@ -248,11 +248,10 @@
     // Hàm khóa đáp án (sử dụng set() Modular API)
     function lockAnswers() {
       if (!roomRef) return;
-      // *** set(ref(roomRef, 'lockedAnswer'), true) ***
       set(ref(roomRef, 'lockedAnswer'), true).then(() => {
         showPopup("Đã khóa đáp án.");
-      });
-      // Xóa bộ đếm ngược tự động khóa nếu có
+      }).catch(e => showPopup("Lỗi khóa đáp án. Kiểm tra Rules Firebase.", "error")); // Thêm catch lỗi
+      
       if (answerTimeout) {
         clearTimeout(answerTimeout);
         answerTimeout = null;
@@ -266,7 +265,6 @@
         return;
       }
 
-      // 1. Xóa bộ đếm ngược tự động khóa hiện tại (nếu đang chạy)
       if (answerTimeout) {
         clearTimeout(answerTimeout);
         answerTimeout = null;
@@ -281,25 +279,22 @@
       }
 
       // 2. Mở đáp án trên Firebase (sử dụng set() Modular API)
-      // *** set(ref(roomRef, 'lockedAnswer'), false) ***
       set(ref(roomRef, 'lockedAnswer'), false).then(() => {
         showPopup(`Đã mở đáp án trong ${durationSeconds} giây!`);
       }).catch(error => {
         console.error("Lỗi khi mở đáp án:", error);
-        showPopup("Lỗi khi mở đáp án.", "error");
+        showPopup("Lỗi khi mở đáp án. Kiểm tra Rules Firebase.", "error");
         return;
       });
 
       // 3. Thiết lập timeout để tự động khóa
       answerTimeout = setTimeout(() => {
-        if (!roomRef) return; // Kiểm tra an toàn
-        // Tự động khóa (sử dụng set() Modular API)
-        // *** set(ref(roomRef, 'lockedAnswer'), true) ***
+        if (!roomRef) return; 
         set(ref(roomRef, 'lockedAnswer'), true).then(() => {
           showPopup("Hết giờ. Đáp án đã tự động khóa.");
-        });
-        answerTimeout = null; // Timer đã kết thúc
-      }, durationSeconds * 1000); // Chuyển giây sang mili giây
+        }).catch(e => showPopup("Lỗi tự động khóa. Kiểm tra Rules Firebase.", "error")); // Thêm catch lỗi
+        answerTimeout = null; 
+      }, durationSeconds * 1000); 
     }
 
 
@@ -313,9 +308,8 @@
       currentRoomCode = code;
       document.getElementById('roomInfo').innerHTML = `🔑 <b>Mã phòng:</b> <span style="color:black;">${code}</span>`;
 
-      // *** Tạo roomRef bằng ref(db, 'path') ***
       roomRef = ref(db, 'rooms/' + code);
-      // *** set(roomRef, data) thay vì roomRef.set(data) ***
+      // Sử dụng set() Modular API để tạo phòng
       set(roomRef, {
         answers: {},
         buzzOrder: [],
@@ -324,10 +318,11 @@
       }).then(() => {
         document.getElementById('btnCreate').disabled = true;
         showPopup("Đã tạo phòng thành công! Mã phòng: " + code);
+        // Gán các hàm xử lý nút bấm khác sau khi tạo phòng thành công
         attachListeners();
       }).catch(error => {
         console.error("Lỗi khi tạo phòng:", error);
-        showPopup("Lỗi khi tạo phòng.", "error");
+        showPopup("Lỗi khi tạo phòng. Kiểm tra Rules Firebase.", "error");
         currentRoomCode = null;
       });
     };
@@ -336,7 +331,7 @@
       const statusAnswer = document.getElementById('statusAnswer');
       const statusBuzz = document.getElementById('statusBuzz');
 
-      // *** Lắng nghe trạng thái 'lockedAnswer' bằng onValue(ref(roomRef, 'path'), callback) ***
+      // Lắng nghe trạng thái 'lockedAnswer'
       onValue(ref(roomRef, 'lockedAnswer'), snap => {
         const val = snap.val();
         const locked = val === true || val === "true";
@@ -349,7 +344,7 @@
         }
       });
 
-      // *** Lắng nghe trạng thái 'lockedBuzz' ***
+      // Lắng nghe trạng thái 'lockedBuzz'
       onValue(ref(roomRef, 'lockedBuzz'), snap => {
         const val = snap.val();
         const locked = val === true || val === "true";
@@ -362,13 +357,11 @@
         }
       });
 
-      // *** Lắng nghe dữ liệu 'answers' ***
+      // Lắng nghe dữ liệu 'answers'
       onValue(ref(roomRef, 'answers'), snap => {
         const obj = snap.val() || {};
         const tbl = document.getElementById('tblAnswers');
         tbl.innerHTML = '<tr><th>Tên</th><th>Đáp án</th><th>Thời gian</th></tr>';
-        // Sắp xếp theo timestamp (ts)
-        // Lưu ý: Object.values(obj) hoạt động tốt với dữ liệu Firebase trả về
         Object.values(obj).sort((a, b) => a.ts - b.ts).forEach(x => {
           const tr = tbl.insertRow();
           tr.insertCell().innerText = x.name;
@@ -377,13 +370,11 @@
         });
       });
 
-      // *** Lắng nghe dữ liệu 'buzzOrder' ***
+      // Lắng nghe dữ liệu 'buzzOrder'
       onValue(ref(roomRef, 'buzzOrder'), snap => {
         const list = snap.val() || [];
         const ol = document.getElementById('buzzList');
         ol.innerHTML = '';
-        // Cần đảm bảo list là một mảng nếu dữ liệu được push lên, nếu không cần xử lý key/value
-        // Giả định list là một mảng các đối tượng {userId, name, ts}
         Object.values(list).forEach(x => {
           const li = document.createElement('li');
           li.innerText = x.name + ' (' + new Date(x.ts).toLocaleTimeString() + ')';
@@ -391,28 +382,24 @@
         });
       });
 
-      // Các nút điều khiển sử dụng set() Modular API
+      // GÁN CÁC HÀM XỬ LÝ NÚT BẤM SAU KHI TẠO PHÒNG
       document.getElementById('lockAnswers').onclick = lockAnswers;
       document.getElementById('unlockAnswers').onclick = timedUnlockAnswers;
-      // *** set(ref(roomRef, 'answers'), {}) ***
       document.getElementById('resetAnswers').onclick = () => {
-        set(ref(roomRef, 'answers'), {});
+        set(ref(roomRef, 'answers'), {}).catch(e => showPopup("Lỗi reset. Kiểm tra Rules Firebase.", "error"));
         showPopup("Đã reset danh sách đáp án.");
       };
 
-      // *** set(ref(roomRef, 'lockedBuzz'), true) ***
       document.getElementById('lockBuzz').onclick = () => {
-        set(ref(roomRef, 'lockedBuzz'), true);
+        set(ref(roomRef, 'lockedBuzz'), true).catch(e => showPopup("Lỗi khóa chuông. Kiểm tra Rules Firebase.", "error"));
         showPopup("Đã khóa chuông.");
       };
-      // *** set(ref(roomRef, 'lockedBuzz'), false) ***
       document.getElementById('unlockBuzz').onclick = () => {
-        set(ref(roomRef, 'lockedBuzz'), false);
+        set(ref(roomRef, 'lockedBuzz'), false).catch(e => showPopup("Lỗi mở chuông. Kiểm tra Rules Firebase.", "error"));
         showPopup("Đã mở chuông!");
       };
-      // *** set(ref(roomRef, 'buzzOrder'), []) ***
       document.getElementById('resetBuzz').onclick = () => {
-        set(ref(roomRef, 'buzzOrder'), []);
+        set(ref(roomRef, 'buzzOrder'), []).catch(e => showPopup("Lỗi reset chuông. Kiểm tra Rules Firebase.", "error"));
         showPopup("Đã reset thứ tự chuông.");
       };
     }
