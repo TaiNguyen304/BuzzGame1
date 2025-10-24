@@ -21,8 +21,8 @@
 
     textarea {
       width: 80%;
-      max-width: 400px;
-      height: 60px;
+      max-width: 1000px;
+      height: 100px;
       resize: none;
       margin-bottom: 10px;
     }
@@ -43,7 +43,7 @@
     }
 
     #btnJoin {
-      background: #ff00cc;
+      background: purple;
       color: white;
       font-weight: bold;
       height: 40px;
@@ -60,23 +60,25 @@
     #btnSend,
     #btnBuzz {
       width: 80%;
-      width: 800px;
-      height: 75px;
+      max-width: 1000px;
+      height: 100px;
       margin-top: 5px;
       margin-bottom: 5px;
       font-size: 18px;
     }
 
     #btnSend {
-      background: purple;
+      background: yellow;
+      color: black;
     }
 
     #btnSend:hover {
       background: orange;
+      color: white;
     }
 
     #btnBuzz {
-      background: red;
+      background: blue;
     }
 
     #btnBuzz:hover {
@@ -88,8 +90,8 @@
       top: 20px;
       left: 50%;
       transform: translateX(-50%);
-      background-color: green;
-      color: white;
+      background-color: yellow;
+      color: black;
       padding: 15px 30px;
       border-radius: 5px;
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
@@ -104,6 +106,21 @@
       color: white;
       font-weight: bold;
     }
+    
+    /* CSS MỚI: Cho 2 dòng thông báo thời gian */
+    .timer-info {
+        font-weight: bold;
+        color: black;
+        margin-bottom: 5px;
+        text-align: center;
+        width: 80%;
+        max-width: 1000px;
+    }
+    .timer-countdown {
+        color: red; /* Để dễ nhận biết */
+        font-size: 1.1em;
+        font-weight: bold;
+    }
   </style>
 </head>
 
@@ -114,6 +131,13 @@
   <button id="btnJoin">Xác nhận</button>
 
   <div id="gameArea">
+    <div id="answerTimerInfo" class="timer-info">
+      Thời gian gửi đáp án còn lại: <span id="answerCountdown" class="timer-countdown">--.--s</span>
+    </div>
+    <div id="buzzTimerInfo" class="timer-info">
+      Thời gian bấm chuông còn lại: <span id="buzzCountdown" class="timer-countdown">--.--s</span>
+    </div>
+
     <textarea id="answer" placeholder="Nhập đáp án..."></textarea>
     <button id="btnSend">Gửi đáp án</button>
     <button id="btnBuzz">Bấm chuông</button>
@@ -144,10 +168,89 @@
     const analytics = getAnalytics(app);
     const db = getDatabase(app);
 
-    let roomRef, userId, startTime = null;
+    let roomRef, userId;
+    let answerStartTimeTS = null; 
+    let buzzStartTimeTS = null;
     let lockedAnswer = true;
     let lockedBuzz = true;
     let hasBuzzed = false;
+
+    // Biến lưu thời điểm khóa tự động và ID của interval đếm ngược
+    let answerLockTime = 0; // Thời điểm (timestamp) đáp án sẽ bị khóa
+    let answerInterval = null;
+    let buzzLockTime = 0; // Thời điểm (timestamp) chuông sẽ bị khóa
+    let buzzInterval = null;
+
+    // Hàm hiển thị đếm ngược đáp án (Đã sửa: toFixed(3))
+    function startAnswerCountdown(durationSeconds) {
+        // Xóa interval cũ nếu có
+        if (answerInterval) clearInterval(answerInterval);
+        
+        answerLockTime = Date.now() + (durationSeconds * 1000);
+        answerStartTimeTS = Date.now(); // Ghi lại thời điểm bắt đầu chính thức (TS)
+        
+        const countdownEl = document.getElementById('answerCountdown');
+
+        // FIX: Đổi toFixed(4) thành toFixed(3)
+        countdownEl.innerText = durationSeconds.toFixed(3) + 's';
+
+        answerInterval = setInterval(() => {
+            const remaining = answerLockTime - Date.now();
+            if (remaining <= 0) {
+                clearInterval(answerInterval);
+                answerInterval = null;
+                countdownEl.innerText = '0.000s';
+            } else {
+                // FIX: Đổi toFixed(4) thành toFixed(3)
+                let timeStr = (Math.max(0, remaining) / 1000).toFixed(3);
+                
+                countdownEl.innerText = timeStr + 's';
+            }
+        }, 1); // Cập nhật mỗi 1ms
+    }
+
+    // Hàm hiển thị đếm ngược chuông (Đã sửa: toFixed(3))
+    function startBuzzCountdown(durationSeconds) {
+        // Xóa interval cũ nếu có
+        if (buzzInterval) clearInterval(buzzInterval);
+        
+        buzzLockTime = Date.now() + (durationSeconds * 1000);
+        buzzStartTimeTS = Date.now(); // Ghi lại thời điểm bắt đầu chính thức (TS)
+        
+        const countdownEl = document.getElementById('buzzCountdown');
+
+        // FIX: Đổi toFixed(4) thành toFixed(3)
+        countdownEl.innerText = durationSeconds.toFixed(3) + 's';
+
+        buzzInterval = setInterval(() => {
+            const remaining = buzzLockTime - Date.now();
+            if (remaining <= 0) {
+                clearInterval(buzzInterval);
+                buzzInterval = null;
+                countdownEl.innerText = '0.000s';
+            } else {
+                // FIX: Đổi toFixed(4) thành toFixed(3)
+                let timeStr = (Math.max(0, remaining) / 1000).toFixed(3);
+                
+                countdownEl.innerText = timeStr + 's';
+            }
+        }, 1); // Cập nhật mỗi 1ms
+    }
+
+    // Hàm reset hiển thị đồng hồ
+    function resetAnswerCountdownDisplay() {
+        if (answerInterval) clearInterval(answerInterval);
+        answerInterval = null;
+        document.getElementById('answerCountdown').innerText = '--.--s';
+        answerStartTimeTS = null; // Reset thời điểm bắt đầu
+    }
+
+    function resetBuzzCountdownDisplay() {
+        if (buzzInterval) clearInterval(buzzInterval);
+        buzzInterval = null;
+        document.getElementById('buzzCountdown').innerText = '--.--s';
+        buzzStartTimeTS = null; // Reset thời điểm bắt đầu
+    }
 
     function showPopup(message, type = 'success') {
       const popup = document.getElementById('popupMessage');
@@ -187,22 +290,64 @@
           document.getElementById('btnJoin').disabled = true;
           showPopup("Kết nối thành công với phòng " + code + ".");
 
+          // Lắng nghe trạng thái Answer
           onValue(ref(roomRef, 'lockedAnswer'), s => {
+            const oldLockedAnswer = lockedAnswer; // Lưu trạng thái cũ
             lockedAnswer = s.val();
+
             if (!lockedAnswer) {
-              startTime = Date.now();
+              // Mở đáp án: Lấy thời gian mở từ Host.html
+              get(ref(roomRef, 'answerDuration')).then(durationSnap => {
+                const durationSeconds = durationSnap.val(); 
+                // Chỉ khởi tạo đếm ngược nếu trạng thái **chuyển từ khóa sang mở** (hoặc lần đầu) VÀ có duration
+                if (durationSeconds && (oldLockedAnswer === true)) { 
+                    startAnswerCountdown(durationSeconds); 
+                } else if (!durationSeconds) { // Nếu không có duration, coi như vĩnh viễn hoặc reset
+                    resetAnswerCountdownDisplay();
+                    document.getElementById('answerCountdown').innerText = '∞';
+                    answerStartTimeTS = Date.now(); // Vẫn ghi nhận TS bắt đầu nếu Vĩnh viễn
+                }
+              }).catch(() => {
+                  // Mở Vĩnh viễn (hoặc lỗi), không có duration
+                  resetAnswerCountdownDisplay();
+                  document.getElementById('answerCountdown').innerText = '∞';
+                  answerStartTimeTS = Date.now(); // Vẫn ghi nhận TS bắt đầu nếu Vĩnh viễn
+              });
+              
               showPopup("Host đã MỞ đáp án. Bạn có thể gửi đáp án!");
             } else {
+              resetAnswerCountdownDisplay(); // Reset đồng hồ khi bị khóa
               showPopup("Host đã KHÓA đáp án!", 'error');
             }
           });
-
+          
+          // Lắng nghe trạng thái Buzz
           onValue(ref(roomRef, 'lockedBuzz'), s => {
+            const oldLockedBuzz = lockedBuzz; // Lưu trạng thái cũ
             lockedBuzz = s.val();
+            
             if (!lockedBuzz) {
+              // Mở chuông: Tương tự, **GIẢ ĐỊNH** Host đã SET giá trị `buzzDuration` khi mở
+              get(ref(roomRef, 'buzzDuration')).then(durationSnap => {
+                const durationSeconds = durationSnap.val();
+                if (durationSeconds && (oldLockedBuzz === true)) {
+                    startBuzzCountdown(durationSeconds);
+                } else if (!durationSeconds) {
+                    resetBuzzCountdownDisplay();
+                    document.getElementById('buzzCountdown').innerText = '∞';
+                    buzzStartTimeTS = Date.now(); // Vẫn ghi nhận TS bắt đầu nếu Vĩnh viễn
+                }
+              }).catch(() => {
+                  // Mở Vĩnh viễn (hoặc lỗi), không có duration
+                  resetBuzzCountdownDisplay();
+                  document.getElementById('buzzCountdown').innerText = '∞';
+                  buzzStartTimeTS = Date.now(); // Vẫn ghi nhận TS bắt đầu nếu Vĩnh viễn
+              });
+              
               hasBuzzed = false;
               showPopup("Host đã MỞ chuông. Bạn có thể bấm chuông!");
             } else {
+              resetBuzzCountdownDisplay(); // Reset đồng hồ khi bị khóa
               showPopup("Host đã KHÓA chuông!", 'error');
             }
           });
@@ -214,6 +359,11 @@
               hasBuzzed = false;
             }
           });
+          
+          // Khởi tạo hiển thị đồng hồ lần đầu
+          resetAnswerCountdownDisplay();
+          resetBuzzCountdownDisplay();
+
         } else {
           showPopup("Mã phòng không hợp lệ hoặc Host chưa tạo phòng này.", 'error');
           roomRef = null;
@@ -227,16 +377,21 @@
     document.getElementById('btnSend').onclick = () => {
       if (!roomRef) return showPopup("Vui lòng tham gia phòng trước.", 'error');
       if (lockedAnswer) return showPopup("Hiện tại chưa thể gửi đáp án!", 'error');
+      if (answerStartTimeTS === null) return showPopup("Chưa nhận được tín hiệu Mở đáp án từ Host.", 'error'); 
 
       const answer = document.getElementById('answer').value.trim();
       if (!answer) return showPopup("Vui lòng nhập đáp án trước khi gửi.", 'error');
 
-      const timeElapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+      const ts = Date.now();
+      // FIX: Đổi toFixed(4) thành toFixed(3)
+      const timeElapsed = ((ts - answerStartTimeTS) / 1000).toFixed(3);
+      
       set(ref(roomRef, 'answers/' + userId), {
         name: document.getElementById('name').value,
         answer: answer,
-        ts: Date.now()
-      }).catch(e => showPopup("Lỗi gửi đáp án. Kiểm tra Rules Firebase.", "error")); // Thêm catch lỗi
+        ts: ts // Ghi lại timestamp
+      }).catch(e => showPopup("Lỗi gửi đáp án. Kiểm tra Rules Firebase.", "error")); 
+      // FIX: Hiển thị thời gian elapsed time với 3 chữ số
       showPopup(`Đã gửi đáp án "${answer}" vào lúc ${timeElapsed}s.`);
     };
 
@@ -244,14 +399,21 @@
       if (!roomRef) return showPopup("Vui lòng tham gia phòng trước.", 'error');
       if (lockedBuzz) return showPopup("Hiện tại chưa thể bấm chuông!", 'error');
       if (hasBuzzed) return showPopup("Bạn đã bấm chuông rồi!", 'error');
+      if (buzzStartTimeTS === null) return showPopup("Chưa nhận được tín hiệu Mở chuông từ Host.", 'error'); 
 
       hasBuzzed = true;
+      
+      const ts = Date.now();
+      // FIX: Đổi toFixed(4) thành toFixed(3)
+      const timeElapsed = ((ts - buzzStartTimeTS) / 1000).toFixed(3);
+
       push(ref(roomRef, 'buzzOrder'), {
         userId,
         name: document.getElementById('name').value,
-        ts: Date.now()
-      }).catch(e => showPopup("Lỗi bấm chuông. Kiểm tra Rules Firebase.", "error")); // Thêm catch lỗi
-      showPopup("Bấm chuông thành công!");
+        ts: ts // Ghi lại timestamp
+      }).catch(e => showPopup("Lỗi bấm chuông. Kiểm tra Rules Firebase.", "error")); 
+      // FIX: Hiển thị thời gian elapsed time trên popup với 3 chữ số
+      showPopup(`Bấm chuông thành công vào lúc ${timeElapsed}s!`);
     };
   </script>
 </body>
