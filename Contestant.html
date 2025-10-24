@@ -51,6 +51,7 @@
       margin-right: 5px;
       padding: 10px 20px;
       font-size: 16px;
+      width: auto;
     }
 
     #btnJoin:hover {
@@ -106,8 +107,7 @@
       color: white;
       font-weight: bold;
     }
-    
-    /* CSS MỚI: Cho 2 dòng thông báo thời gian */
+
     .timer-info {
         font-weight: bold;
         color: black;
@@ -117,7 +117,7 @@
         max-width: 1000px;
     }
     .timer-countdown {
-        color: red; /* Để dễ nhận biết */
+        color: red;
         font-size: 1.1em;
         font-weight: bold;
     }
@@ -146,274 +146,117 @@
   <div id="popupMessage"></div>
 
   <script type="module">
-    // *** Cập nhật Import sang phiên bản ổn định (v10.0.0) ***
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-analytics.js";
     import { getDatabase, ref, onValue, set, get, push } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
 
-
-    // Your web app's Firebase configuration
+    // THAY BẰNG CONFIG CỦA BẠN
     const firebaseConfig = {
       apiKey: "AIzaSyAKTVuijDV4QfHjDcnEau2w9MaRL9YduEQ",
       authDomain: "buzz-game-7c91c.firebaseapp.com",
+      databaseURL: "https://buzz-game-7c91c-default-rtdb.firebaseio.com",
       projectId: "buzz-game-7c91c",
-      storageBucket: "buzz-game-7c91c.firebasestorage.app",
+      storageBucket: "buzz-game-7c91c.appspot.com",
       messagingSenderId: "946217092381",
-      appId: "1:946217092381:web:d81064145965fb151acdf4",
-      measurementId: "G-C7KG9KSJ9C"
+      appId: "1:946217092381:web:d81064145965fb151acdf4"
     };
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
-    const analytics = getAnalytics(app);
     const db = getDatabase(app);
+    let roomRef = null, userId = null;
+    let answerStartTime = null, buzzStartTime = null;
+    let lockedAnswer = true, lockedBuzz = true, hasBuzzed = false;
+    let answerInterval = null, buzzInterval = null;
 
-    let roomRef, userId;
-    let answerStartTimeTS = null; 
-    let buzzStartTimeTS = null;
-    let lockedAnswer = true;
-    let lockedBuzz = true;
-    let hasBuzzed = false;
-
-    // Biến lưu thời điểm khóa tự động và ID của interval đếm ngược
-    let answerLockTime = 0; // Thời điểm (timestamp) đáp án sẽ bị khóa
-    let answerInterval = null;
-    let buzzLockTime = 0; // Thời điểm (timestamp) chuông sẽ bị khóa
-    let buzzInterval = null;
-
-    // Hàm hiển thị đếm ngược đáp án (Đã sửa: toFixed(3))
-    function startAnswerCountdown(durationSeconds) {
-        // Xóa interval cũ nếu có
-        if (answerInterval) clearInterval(answerInterval);
-        
-        answerLockTime = Date.now() + (durationSeconds * 1000);
-        answerStartTimeTS = Date.now(); // Ghi lại thời điểm bắt đầu chính thức (TS)
-        
-        const countdownEl = document.getElementById('answerCountdown');
-
-        // FIX: Đổi toFixed(4) thành toFixed(3)
-        countdownEl.innerText = durationSeconds.toFixed(3) + 's';
-
-        answerInterval = setInterval(() => {
-            const remaining = answerLockTime - Date.now();
-            if (remaining <= 0) {
-                clearInterval(answerInterval);
-                answerInterval = null;
-                countdownEl.innerText = '0.000s';
-            } else {
-                // FIX: Đổi toFixed(4) thành toFixed(3)
-                let timeStr = (Math.max(0, remaining) / 1000).toFixed(3);
-                
-                countdownEl.innerText = timeStr + 's';
-            }
-        }, 1); // Cập nhật mỗi 1ms
+    function showPopup(msg, type = 'success') {
+      const p = document.getElementById('popupMessage');
+      p.innerText = msg;
+      p.className = type === 'error' ? 'error' : '';
+      p.style.opacity = '1'; p.style.top = '40px';
+      setTimeout(() => { p.style.opacity = '0'; p.style.top = '20px'; }, 3000);
     }
 
-    // Hàm hiển thị đếm ngược chuông (Đã sửa: toFixed(3))
-    function startBuzzCountdown(durationSeconds) {
-        // Xóa interval cũ nếu có
-        if (buzzInterval) clearInterval(buzzInterval);
-        
-        buzzLockTime = Date.now() + (durationSeconds * 1000);
-        buzzStartTimeTS = Date.now(); // Ghi lại thời điểm bắt đầu chính thức (TS)
-        
-        const countdownEl = document.getElementById('buzzCountdown');
-
-        // FIX: Đổi toFixed(4) thành toFixed(3)
-        countdownEl.innerText = durationSeconds.toFixed(3) + 's';
-
-        buzzInterval = setInterval(() => {
-            const remaining = buzzLockTime - Date.now();
-            if (remaining <= 0) {
-                clearInterval(buzzInterval);
-                buzzInterval = null;
-                countdownEl.innerText = '0.000s';
-            } else {
-                // FIX: Đổi toFixed(4) thành toFixed(3)
-                let timeStr = (Math.max(0, remaining) / 1000).toFixed(3);
-                
-                countdownEl.innerText = timeStr + 's';
-            }
-        }, 1); // Cập nhật mỗi 1ms
-    }
-
-    // Hàm reset hiển thị đồng hồ
-    function resetAnswerCountdownDisplay() {
-        if (answerInterval) clearInterval(answerInterval);
-        answerInterval = null;
-        document.getElementById('answerCountdown').innerText = '--.--s';
-        answerStartTimeTS = null; // Reset thời điểm bắt đầu
-    }
-
-    function resetBuzzCountdownDisplay() {
-        if (buzzInterval) clearInterval(buzzInterval);
-        buzzInterval = null;
-        document.getElementById('buzzCountdown').innerText = '--.--s';
-        buzzStartTimeTS = null; // Reset thời điểm bắt đầu
-    }
-
-    function showPopup(message, type = 'success') {
-      const popup = document.getElementById('popupMessage');
-      popup.innerText = message;
-      if (type === 'error') popup.classList.add('error');
-      else popup.classList.remove('error');
-
-      popup.style.transition = 'none';
-      popup.style.opacity = '0';
-      popup.style.top = '20px';
-      void popup.offsetHeight;
-
-      popup.style.transition = 'opacity 0.5s, top 0.5s';
-      popup.style.opacity = '1';
-      popup.style.top = '40px';
-      setTimeout(() => {
-        popup.style.opacity = '0';
-        popup.style.top = '20px';
-      }, 3000);
+    function startCountdown(elId, duration) {
+      const el = document.getElementById(elId);
+      const end = Date.now() + duration * 1000;
+      const start = Date.now();
+      clearInterval(window[elId + 'Int']);
+      window[elId + 'Int'] = setInterval(() => {
+        const remain = Math.max(0, end - Date.now()) / 1000;
+        el.innerText = remain.toFixed(3) + 's';
+        if (remain <= 0) clearInterval(window[elId + 'Int']);
+      }, 1);
+      return start;
     }
 
     document.getElementById('btnJoin').onclick = () => {
       const code = document.getElementById('roomCode').value.trim();
       const name = document.getElementById('name').value.trim();
+      if (!code || !name || code.length !== 6 || isNaN(code)) return showPopup("Thông tin không hợp lệ!", 'error');
 
-      if (!code || !name) return showPopup("Vui lòng nhập Mã phòng và Tên.", 'error');
-      if (code.length !== 6 || isNaN(code)) return showPopup("Mã phòng phải là 6 chữ số.", 'error');
-
-      userId = 'u_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+      userId = 'u_' + Date.now();
       roomRef = ref(db, 'rooms/' + code);
-
       get(roomRef).then(snap => {
-        if (snap.exists()) {
-          document.getElementById('gameArea').style.display = 'flex';
-          document.getElementById('roomCode').disabled = true;
-          document.getElementById('name').disabled = true;
-          document.getElementById('btnJoin').disabled = true;
-          showPopup("Kết nối thành công với phòng " + code + ".");
-
-          // Lắng nghe trạng thái Answer
-          onValue(ref(roomRef, 'lockedAnswer'), s => {
-            const oldLockedAnswer = lockedAnswer; // Lưu trạng thái cũ
-            lockedAnswer = s.val();
-
-            if (!lockedAnswer) {
-              // Mở đáp án: Lấy thời gian mở từ Host.html
-              get(ref(roomRef, 'answerDuration')).then(durationSnap => {
-                const durationSeconds = durationSnap.val(); 
-                // Chỉ khởi tạo đếm ngược nếu trạng thái **chuyển từ khóa sang mở** (hoặc lần đầu) VÀ có duration
-                if (durationSeconds && (oldLockedAnswer === true)) { 
-                    startAnswerCountdown(durationSeconds); 
-                } else if (!durationSeconds) { // Nếu không có duration, coi như vĩnh viễn hoặc reset
-                    resetAnswerCountdownDisplay();
-                    document.getElementById('answerCountdown').innerText = '∞';
-                    answerStartTimeTS = Date.now(); // Vẫn ghi nhận TS bắt đầu nếu Vĩnh viễn
-                }
-              }).catch(() => {
-                  // Mở Vĩnh viễn (hoặc lỗi), không có duration
-                  resetAnswerCountdownDisplay();
-                  document.getElementById('answerCountdown').innerText = '∞';
-                  answerStartTimeTS = Date.now(); // Vẫn ghi nhận TS bắt đầu nếu Vĩnh viễn
-              });
-              
-              showPopup("Host đã MỞ đáp án. Bạn có thể gửi đáp án!");
-            } else {
-              resetAnswerCountdownDisplay(); // Reset đồng hồ khi bị khóa
-              showPopup("Host đã KHÓA đáp án!", 'error');
-            }
-          });
-          
-          // Lắng nghe trạng thái Buzz
-          onValue(ref(roomRef, 'lockedBuzz'), s => {
-            const oldLockedBuzz = lockedBuzz; // Lưu trạng thái cũ
-            lockedBuzz = s.val();
-            
-            if (!lockedBuzz) {
-              // Mở chuông: Tương tự, **GIẢ ĐỊNH** Host đã SET giá trị `buzzDuration` khi mở
-              get(ref(roomRef, 'buzzDuration')).then(durationSnap => {
-                const durationSeconds = durationSnap.val();
-                if (durationSeconds && (oldLockedBuzz === true)) {
-                    startBuzzCountdown(durationSeconds);
-                } else if (!durationSeconds) {
-                    resetBuzzCountdownDisplay();
-                    document.getElementById('buzzCountdown').innerText = '∞';
-                    buzzStartTimeTS = Date.now(); // Vẫn ghi nhận TS bắt đầu nếu Vĩnh viễn
-                }
-              }).catch(() => {
-                  // Mở Vĩnh viễn (hoặc lỗi), không có duration
-                  resetBuzzCountdownDisplay();
-                  document.getElementById('buzzCountdown').innerText = '∞';
-                  buzzStartTimeTS = Date.now(); // Vẫn ghi nhận TS bắt đầu nếu Vĩnh viễn
-              });
-              
-              hasBuzzed = false;
-              showPopup("Host đã MỞ chuông. Bạn có thể bấm chuông!");
-            } else {
-              resetBuzzCountdownDisplay(); // Reset đồng hồ khi bị khóa
-              showPopup("Host đã KHÓA chuông!", 'error');
-            }
-          });
-
-          onValue(ref(roomRef, 'buzzOrder'), snap => {
-            // Logic reset chuông: nếu danh sách trống thì cho phép bấm lại
-            const list = snap.val();
-            if (list === null || Object.keys(list).length === 0) {
-              hasBuzzed = false;
-            }
-          });
-          
-          // Khởi tạo hiển thị đồng hồ lần đầu
-          resetAnswerCountdownDisplay();
-          resetBuzzCountdownDisplay();
-
-        } else {
-          showPopup("Mã phòng không hợp lệ hoặc Host chưa tạo phòng này.", 'error');
-          roomRef = null;
-        }
-      }).catch(error => {
-        console.error("Lỗi khi kết nối:", error);
-        showPopup("Lỗi kết nối Firebase. Vui lòng kiểm tra console.", 'error');
-      });
+        if (!snap.exists()) throw "Phòng không tồn tại";
+        document.getElementById('gameArea').style.display = 'flex';
+        document.getElementById('roomCode').disabled = document.getElementById('name').disabled = document.getElementById('btnJoin').disabled = true;
+        showPopup("Kết nối thành công!");
+        setupListeners();
+      }).catch(() => showPopup("Không tìm thấy phòng!", 'error'));
     };
 
+    function setupListeners() {
+      onValue(ref(roomRef, 'lockedAnswer'), s => {
+        const wasLocked = lockedAnswer;
+        lockedAnswer = s.val();
+        if (!lockedAnswer && wasLocked) {
+          get(ref(roomRef, 'answerDuration')).then(d => {
+            const dur = d.val();
+            if (dur) answerStartTime = startCountdown('answerCountdown', dur);
+            else { document.getElementById('answerCountdown').innerText = '∞'; answerStartTime = Date.now(); }
+          });
+          showPopup("Host mở đáp án!");
+        } else if (lockedAnswer) {
+          clearInterval(answerInterval); document.getElementById('answerCountdown').innerText = '--.--s'; answerStartTime = null;
+        }
+      });
+
+      onValue(ref(roomRef, 'lockedBuzz'), s => {
+        const wasLocked = lockedBuzz;
+        lockedBuzz = s.val();
+        if (!lockedBuzz && wasLocked) {
+          get(ref(roomRef, 'buzzDuration')).then(d => {
+            const dur = d.val();
+            if (dur) buzzStartTime = startCountdown('buzzCountdown', dur);
+            else { document.getElementById('buzzCountdown').innerText = '∞'; buzzStartTime = Date.now(); }
+          });
+          hasBuzzed = false;
+          showPopup("Host mở chuông!");
+        } else if (lockedBuzz) {
+          clearInterval(buzzInterval); document.getElementById('buzzCountdown').innerText = '--.--s'; buzzStartTime = null;
+        }
+      });
+
+      onValue(ref(roomRef, 'buzzOrder'), s => {
+        const list = s.val() || {};
+        hasBuzzed = Object.values(list).some(x => x.userId === userId);
+      });
+    }
+
     document.getElementById('btnSend').onclick = () => {
-      if (!roomRef) return showPopup("Vui lòng tham gia phòng trước.", 'error');
-      if (lockedAnswer) return showPopup("Hiện tại chưa thể gửi đáp án!", 'error');
-      if (answerStartTimeTS === null) return showPopup("Chưa nhận được tín hiệu Mở đáp án từ Host.", 'error'); 
-
-      const answer = document.getElementById('answer').value.trim();
-      if (!answer) return showPopup("Vui lòng nhập đáp án trước khi gửi.", 'error');
-
+      if (lockedAnswer || !answerStartTime) return showPopup("Chưa mở đáp án!", 'error');
+      const ans = document.getElementById('answer').value.trim();
+      if (!ans) return showPopup("Nhập đáp án!", 'error');
       const ts = Date.now();
-      // FIX: Đổi toFixed(4) thành toFixed(3)
-      const timeElapsed = ((ts - answerStartTimeTS) / 1000).toFixed(3);
-      
-      set(ref(roomRef, 'answers/' + userId), {
-        name: document.getElementById('name').value,
-        answer: answer,
-        ts: ts // Ghi lại timestamp
-      }).catch(e => showPopup("Lỗi gửi đáp án. Kiểm tra Rules Firebase.", "error")); 
-      // FIX: Hiển thị thời gian elapsed time với 3 chữ số
-      showPopup(`Đã gửi đáp án "${answer}" vào lúc ${timeElapsed}s.`);
+      set(ref(roomRef, 'answers/' + userId), { name: document.getElementById('name').value, answer: ans, ts });
+      showPopup(`Gửi lúc ${((ts - answerStartTime)/1000).toFixed(3)}s`);
     };
 
     document.getElementById('btnBuzz').onclick = () => {
-      if (!roomRef) return showPopup("Vui lòng tham gia phòng trước.", 'error');
-      if (lockedBuzz) return showPopup("Hiện tại chưa thể bấm chuông!", 'error');
-      if (hasBuzzed) return showPopup("Bạn đã bấm chuông rồi!", 'error');
-      if (buzzStartTimeTS === null) return showPopup("Chưa nhận được tín hiệu Mở chuông từ Host.", 'error'); 
-
+      if (lockedBuzz || !buzzStartTime || hasBuzzed) return showPopup("Không thể bấm!", 'error');
       hasBuzzed = true;
-      
       const ts = Date.now();
-      // FIX: Đổi toFixed(4) thành toFixed(3)
-      const timeElapsed = ((ts - buzzStartTimeTS) / 1000).toFixed(3);
-
-      push(ref(roomRef, 'buzzOrder'), {
-        userId,
-        name: document.getElementById('name').value,
-        ts: ts // Ghi lại timestamp
-      }).catch(e => showPopup("Lỗi bấm chuông. Kiểm tra Rules Firebase.", "error")); 
-      // FIX: Hiển thị thời gian elapsed time trên popup với 3 chữ số
-      showPopup(`Bấm chuông thành công vào lúc ${timeElapsed}s!`);
+      push(ref(roomRef, 'buzzOrder'), { userId, name: document.getElementById('name').value, ts });
+      showPopup(`Bấm lúc ${((ts - buzzStartTime)/1000).toFixed(3)}s`);
     };
   </script>
 </body>

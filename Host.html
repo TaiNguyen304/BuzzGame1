@@ -41,17 +41,17 @@
 
     /* FIX: Cập nhật CSS cho danh sách bấm chuông */
     ol {
-      text-align: center; /* Căn giữa nội dung list item */
-      width: 550px; /* Tăng chiều dài khung theo yêu cầu */
+      text-align: center;
+      width: 550px;
       margin: 10px auto;
       background: #fff;
       padding: 10px;
       border: 1px solid #aaa;
       border-radius: 6px;
-      font-weight: bold; /* In đậm toàn bộ chữ */
-      word-wrap: break-word; /* Đảm bảo chữ không bị tràn */
-      overflow-wrap: break-word; 
-      list-style-position: inside; /* Đưa số thứ tự vào trong khung để căn giữa */
+      font-weight: bold;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      list-style-position: inside;
     }
 
     #roomInfo {
@@ -61,7 +61,6 @@
       color: #333;
     }
 
-    /* ======= Nút điều khiển ======= */
     button {
       cursor: pointer;
       border-radius: 6px;
@@ -75,7 +74,6 @@
       color: white;
     }
 
-    /* Nút giới hạn (xanh dương) */
     #unlockAnswersLimited,
     #unlockBuzzLimited {
       background: purple;
@@ -83,7 +81,6 @@
       font-weight: bold;
     }
 
-    /* Nút vĩnh viễn (xanh đậm) */
     #unlockAnswersPermanent,
     #unlockBuzzPermanent {
       background: blue;
@@ -110,7 +107,6 @@
       color: white !important;
     }
 
-    /* ======= Trạng thái hiển thị ======= */
     .status-box {
       display: inline-block;
       padding: 8px 15px;
@@ -132,7 +128,6 @@
       color: white;
     }
 
-    /* ======= Popup thông báo ======= */
     #popupMessage {
       position: fixed;
       top: 20px;
@@ -155,7 +150,6 @@
       font-weight: bold;
     }
 
-    /* FIX: CSS mới cho ô nhập thời gian trên 1 đường ngang */
     .control-group {
       margin-bottom: 15px;
       display: flex;
@@ -183,8 +177,8 @@
   <button id="btnCreate">Tạo phòng</button><br><br>
 
   <div>
-    <div class="status-box locked" id="statusAnswer">Đáp án: 🔒 Đang khóa</div>
-    <div class="status-box locked" id="statusBuzz">Chuông: 🚫 Đang khóa</div>
+    <div class="status-box locked" id="statusAnswer">Đáp án: Đang khóa</div>
+    <div class="status-box locked" id="statusBuzz">Chuông: Đang khóa</div>
   </div><br>
 
   <div class="control-group">
@@ -226,59 +220,32 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-analytics.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
 
-    // Your web app's Firebase configuration
+    // THAY BẰNG CONFIG CỦA BẠN (chỉ cần 1 lần)
     const firebaseConfig = {
       apiKey: "AIzaSyAKTVuijDV4QfHjDcnEau2w9MaRL9YduEQ",
       authDomain: "buzz-game-7c91c.firebaseapp.com",
+      databaseURL: "https://buzz-game-7c91c-default-rtdb.firebaseio.com",
       projectId: "buzz-game-7c91c",
-      storageBucket: "buzz-game-7c91c.firebasestorage.app",
+      storageBucket: "buzz-game-7c91c.appspot.com",
       messagingSenderId: "946217092381",
-      appId: "1:946217092381:web:d81064145965fb151acdf4",
-      measurementId: "G-C7KG9KSJ9C"
+      appId: "1:946217092381:web:d81064145965fb151acdf4"
     };
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
-    const analytics = getAnalytics(app);
-
-    // Khởi tạo Database sử dụng Modular API
     const db = getDatabase(app);
-    let roomRef; 
+    let roomRef = null;
     let currentRoomCode = null;
     let answerTimeout = null;
-    let buzzTimeout = null; 
-    
-    // Biến lưu thời điểm Host mở khóa để tính Elapsed Time
+    let buzzTimeout = null;
     let answerStartTime = 0;
     let buzzStartTime = 0;
 
-    // FIX: Hàm định dạng thời gian 3 chữ số thập phân
-    function formatTime(timestamp, startTime) {
-      if (typeof timestamp !== 'number' || isNaN(timestamp) || startTime === 0) return '';
-      
-      // Tính thời gian trôi qua (Elapsed Time) và giữ 3 chữ số thập phân
-      const elapsedTime = Math.max(0, timestamp - startTime);
-      const totalSeconds = elapsedTime / 1000;
-      // FIX: Đổi toFixed(4) thành toFixed(3)
-      return totalSeconds.toFixed(3) + 's';
-    }
-
-    // ====== Popup hiển thị ======
     function showPopup(message, type = 'success') {
       const popup = document.getElementById('popupMessage');
       popup.innerText = message;
-      if (type === 'error') popup.classList.add('error');
-      else popup.classList.remove('error');
-
-      popup.style.transition = 'none';
-      popup.style.opacity = '0';
-      popup.style.top = '20px';
-      void popup.offsetHeight;
-
-      popup.style.transition = 'opacity 0.5s, top 0.5s';
+      popup.className = type === 'error' ? 'error' : '';
       popup.style.opacity = '1';
       popup.style.top = '40px';
       setTimeout(() => {
@@ -291,255 +258,165 @@
       return Math.floor(100000 + Math.random() * 900000).toString();
     }
 
-    // #region Các hàm điều khiển Đáp án
+    function formatTime(timestamp, startTime) {
+      if (!startTime || !timestamp) return '';
+      return ((timestamp - startTime) / 1000).toFixed(3) + 's';
+    }
 
+    // === Đáp án ===
     function lockAnswers() {
       if (!roomRef) return;
-      if (answerTimeout) {
-        clearTimeout(answerTimeout);
-        answerTimeout = null;
-      }
-      answerStartTime = 0; // Reset thời điểm bắt đầu khi khóa
-      set(ref(roomRef, 'lockedAnswer'), true).then(() => {
-        showPopup("Đã khóa đáp án.");
-      }).catch(e => showPopup("Lỗi khóa đáp án. Kiểm tra Rules Firebase.", "error"));
+      clearTimeout(answerTimeout);
+      answerTimeout = null;
+      answerStartTime = 0;
+      set(ref(roomRef, 'lockedAnswer'), true)
+        .then(() => showPopup("Đã khóa đáp án."))
+        .catch(e => showPopup("Lỗi: " + e.message, "error"));
     }
 
     function unlockAnswersLimited() {
-      if (!roomRef) {
-        showPopup("Vui lòng tạo phòng trước.", "error");
-        return;
-      }
-      // Set duration trước để Contestant kịp đọc
-      const durationSeconds = parseInt(document.getElementById('answerDuration').value);
-      set(ref(roomRef, 'answerDuration'), durationSeconds).then(() => {
-          if (answerTimeout) {
-            clearTimeout(answerTimeout);
-            answerTimeout = null;
-          }
+      if (!roomRef) return showPopup("Tạo phòng trước!", "error");
+      const duration = parseInt(document.getElementById('answerDuration').value);
+      if (isNaN(duration) || duration <= 0) return showPopup("Thời gian không hợp lệ!", "error");
 
-          if (isNaN(durationSeconds) || durationSeconds <= 0) {
-            showPopup("Thời gian mở phải là số nguyên dương lớn hơn 0.", 'error');
-            return;
-          }
-          
-          answerStartTime = Date.now(); // Ghi lại thời điểm mở khóa
-          set(ref(roomRef, 'lockedAnswer'), false).then(() => {
-            showPopup(`Đã mở đáp án trong ${durationSeconds} giây!`);
-          }).catch(error => {
-            console.error("Lỗi khi mở đáp án:", error);
-            showPopup("Lỗi khi mở đáp án. Kiểm tra Rules Firebase.", "error");
-            return;
-          });
-
-          answerTimeout = setTimeout(() => {
-            if (!roomRef) return; 
-            set(ref(roomRef, 'lockedAnswer'), true).then(() => {
-              showPopup("Hết giờ. Đáp án đã tự động khóa.");
-            }).catch(e => showPopup("Lỗi tự động khóa. Kiểm tra Rules Firebase.", "error"));
-            answerTimeout = null; 
-          }, durationSeconds * 1000); 
-      });
+      set(ref(roomRef, 'answerDuration'), duration).then(() => {
+        answerStartTime = Date.now();
+        set(ref(roomRef, 'lockedAnswer'), false).then(() => {
+          showPopup(`Đã mở đáp án trong ${duration} giây!`);
+          clearTimeout(answerTimeout);
+          answerTimeout = setTimeout(lockAnswers, duration * 1000);
+        });
+      }).catch(e => showPopup("Lỗi: " + e.message, "error"));
     }
 
     function unlockAnswersPermanent() {
-      if (!roomRef) {
-        showPopup("Vui lòng tạo phòng trước.", "error");
-        return;
-      }
-      if (answerTimeout) {
-        clearTimeout(answerTimeout);
-        answerTimeout = null;
-      }
-      // Reset duration
-      set(ref(roomRef, 'answerDuration'), null);
-      
-      answerStartTime = Date.now(); // Ghi lại thời điểm mở khóa (vĩnh viễn)
-      set(ref(roomRef, 'lockedAnswer'), false).then(() => {
-        showPopup("Đã mở đáp án (Vĩnh viễn).");
-      }).catch(e => showPopup("Lỗi mở đáp án. Kiểm tra Rules Firebase.", "error"));
+      if (!roomRef) return showPopup("Tạo phòng trước!", "error");
+      set(ref(roomRef, 'answerDuration'), null).then(() => {
+        answerStartTime = Date.now();
+        set(ref(roomRef, 'lockedAnswer'), false).then(() => {
+          showPopup("Đã mở đáp án (Vĩnh viễn).");
+        });
+      }).catch(e => showPopup("Lỗi: " + e.message, "error"));
     }
-    
-    // #endregion
 
-    // #region Các hàm điều khiển Chuông
-    
+    // === Chuông ===
     function lockBuzz() {
       if (!roomRef) return;
-      if (buzzTimeout) {
-        clearTimeout(buzzTimeout);
-        buzzTimeout = null;
-      }
-      buzzStartTime = 0; // Reset thời điểm bắt đầu khi khóa
-      set(ref(roomRef, 'lockedBuzz'), true).then(() => {
-        showPopup("Đã khóa chuông.");
-      }).catch(e => showPopup("Lỗi khóa chuông. Kiểm tra Rules Firebase.", "error"));
-    }
-
-    function unlockBuzzPermanent() {
-      if (!roomRef) {
-        showPopup("Vui lòng tạo phòng trước.", "error");
-        return;
-      }
-      if (buzzTimeout) {
-        clearTimeout(buzzTimeout);
-        buzzTimeout = null;
-      }
-      // Reset duration
-      set(ref(roomRef, 'buzzDuration'), null);
-
-      buzzStartTime = Date.now(); // Ghi lại thời điểm mở khóa (vĩnh viễn)
-      set(ref(roomRef, 'lockedBuzz'), false).then(() => {
-        showPopup("Đã mở chuông (Vĩnh viễn)!");
-      }).catch(e => showPopup("Lỗi mở chuông. Kiểm tra Rules Firebase.", "error"));
+      clearTimeout(buzzTimeout);
+      buzzTimeout = null;
+      buzzStartTime = 0;
+      set(ref(roomRef, 'lockedBuzz'), true)
+        .then(() => showPopup("Đã khóa chuông."))
+        .catch(e => showPopup("Lỗi: " + e.message, "error"));
     }
 
     function unlockBuzzLimited() {
-      if (!roomRef) {
-        showPopup("Vui lòng tạo phòng trước.", "error");
-        return;
-      }
-      // Set duration trước để Contestant kịp đọc
-      const durationSeconds = parseInt(document.getElementById('buzzDuration').value);
-      set(ref(roomRef, 'buzzDuration'), durationSeconds).then(() => {
-        if (buzzTimeout) {
-          clearTimeout(buzzTimeout);
-          buzzTimeout = null;
-        }
+      if (!roomRef) return showPopup("Tạo phòng trước!", "error");
+      const duration = parseInt(document.getElementById('buzzDuration').value);
+      if (isNaN(duration) || duration <= 0) return showPopup("Thời gian không hợp lệ!", "error");
 
-        if (isNaN(durationSeconds) || durationSeconds <= 0) {
-          showPopup("Thời gian mở phải là số nguyên dương lớn hơn 0.", 'error');
-          return;
-        }
-
-        buzzStartTime = Date.now(); // Ghi lại thời điểm mở khóa
+      set(ref(roomRef, 'buzzDuration'), duration).then(() => {
+        buzzStartTime = Date.now();
         set(ref(roomRef, 'lockedBuzz'), false).then(() => {
-          showPopup(`Đã mở chuông trong ${durationSeconds} giây!`);
-        }).catch(error => {
-          console.error("Lỗi khi mở chuông:", error);
-          showPopup("Lỗi khi mở chuông. Kiểm tra Rules Firebase.", "error");
-          return;
+          showPopup(`Đã mở chuông trong ${duration} giây!`);
+          clearTimeout(buzzTimeout);
+          buzzTimeout = setTimeout(lockBuzz, duration * 1000);
         });
-
-        buzzTimeout = setTimeout(() => {
-          if (!roomRef) return; 
-          set(ref(roomRef, 'lockedBuzz'), true).then(() => {
-            showPopup("Hết giờ. Chuông đã tự động khóa.");
-          }).catch(e => showPopup("Lỗi tự động khóa chuông. Kiểm tra Rules Firebase.", "error"));
-          buzzTimeout = null; 
-        }, durationSeconds * 1000); 
-      });
+      }).catch(e => showPopup("Lỗi: " + e.message, "error"));
     }
-    
-    // #endregion
 
+    function unlockBuzzPermanent() {
+      if (!roomRef) return showPopup("Tạo phòng trước!", "error");
+      set(ref(roomRef, 'buzzDuration'), null).then(() => {
+        buzzStartTime = Date.now();
+        set(ref(roomRef, 'lockedBuzz'), false).then(() => {
+          showPopup("Đã mở chuông (Vĩnh viễn)!");
+        });
+      }).catch(e => showPopup("Lỗi: " + e.message, "error"));
+    }
 
+    // === Tạo phòng ===
     document.getElementById('btnCreate').onclick = () => {
-      if (currentRoomCode) {
-        showPopup("Phòng đã được tạo. Mã phòng: " + currentRoomCode, "error");
-        return;
-      }
+      if (currentRoomCode) return showPopup("Phòng đã tồn tại!", "error");
 
       const code = generateRoomCode();
       currentRoomCode = code;
-      document.getElementById('roomInfo').innerHTML = `🔑 <b>Mã phòng:</b> <span style="color:black;">${code}</span>`;
-
+      document.getElementById('roomInfo').innerHTML = `Mã phòng: <b style="color:red;">${code}</b>`;
       roomRef = ref(db, 'rooms/' + code);
-      // Sử dụng set() Modular API để tạo phòng
+
       set(roomRef, {
         answers: {},
         buzzOrder: [],
         lockedAnswer: true,
         lockedBuzz: true,
-        answerDuration: null, // Thêm trường duration
-        buzzDuration: null // Thêm trường duration
+        answerDuration: null,
+        buzzDuration: null
       }).then(() => {
         document.getElementById('btnCreate').disabled = true;
-        showPopup("Đã tạo phòng thành công! Mã phòng: " + code);
-        // Gán các hàm xử lý nút bấm khác sau khi tạo phòng thành công
-        attachListeners();
-      }).catch(error => {
-        console.error("Lỗi khi tạo phòng:", error);
-        showPopup("Lỗi khi tạo phòng. Kiểm tra Rules Firebase.", "error");
+        showPopup("Tạo phòng thành công!");
+        attachListeners(); // Gắn nút sau khi tạo
+      }).catch(e => {
+        console.error(e);
+        showPopup("Lỗi tạo phòng: " + e.message, "error");
         currentRoomCode = null;
       });
     };
 
+    // === Gắn nút + lắng nghe dữ liệu ===
     function attachListeners() {
-      const statusAnswer = document.getElementById('statusAnswer');
-      const statusBuzz = document.getElementById('statusBuzz');
-
-      // Lắng nghe trạng thái 'lockedAnswer'
-      onValue(ref(roomRef, 'lockedAnswer'), snap => {
-        const val = snap.val();
-        const locked = val === true || val === "true";
-        if (locked) {
-          statusAnswer.className = 'status-box locked';
-          statusAnswer.innerText = 'Đáp án: 🔒 Đang khóa';
-        } else {
-          statusAnswer.className = 'status-box open';
-          statusAnswer.innerText = 'Đáp án: 🔓 Đang mở';
-        }
+      // Trạng thái
+      onValue(ref(roomRef, 'lockedAnswer'), (snap) => {
+        const locked = snap.val();
+        const el = document.getElementById('statusAnswer');
+        el.className = locked ? 'status-box locked' : 'status-box open';
+        el.innerText = locked ? 'Đáp án: Đang khóa' : 'Đáp án: Đang mở';
       });
 
-      // Lắng nghe trạng thái 'lockedBuzz'
-      onValue(ref(roomRef, 'lockedBuzz'), snap => {
-        const val = snap.val();
-        const locked = val === true || val === "true";
-        if (locked) {
-          statusBuzz.className = 'status-box locked';
-          statusBuzz.innerText = 'Chuông: 🚫 Đang khóa';
-        } else {
-          statusBuzz.className = 'status-box open';
-          statusBuzz.innerText = 'Chuông: 🔔 Đang mở';
-        }
+      onValue(ref(roomRef, 'lockedBuzz'), (snap) => {
+        const locked = snap.val();
+        const el = document.getElementById('statusBuzz');
+        el.className = locked ? 'status-box locked' : 'status-box open';
+        el.innerText = locked ? 'Chuông: Đang khóa' : 'Chuông: Đang mở';
       });
 
-      // Lắng nghe dữ liệu 'answers'
-      onValue(ref(roomRef, 'answers'), snap => {
-        const obj = snap.val() || {};
+      // Danh sách đáp án
+      onValue(ref(roomRef, 'answers'), (snap) => {
+        const data = snap.val() || {};
         const tbl = document.getElementById('tblAnswers');
         tbl.innerHTML = '<tr><th>Tên</th><th>Đáp án</th><th>Thời gian</th></tr>';
-        Object.values(obj).sort((a, b) => a.ts - b.ts).forEach(x => {
+        Object.values(data).sort((a, b) => a.ts - b.ts).forEach(x => {
           const tr = tbl.insertRow();
           tr.insertCell().innerText = x.name;
           tr.insertCell().innerText = x.answer;
-          // FIX: Dùng formatTime mới để hiển thị Elapsed Time (3 chữ số)
-          tr.insertCell().innerText = formatTime(x.ts, answerStartTime); 
+          tr.insertCell().innerText = formatTime(x.ts, answerStartTime);
         });
       });
 
-      // Lắng nghe dữ liệu 'buzzOrder'
-      onValue(ref(roomRef, 'buzzOrder'), snap => {
+      // Thứ tự chuông
+      onValue(ref(roomRef, 'buzzOrder'), (snap) => {
         const list = snap.val() || [];
         const ol = document.getElementById('buzzList');
         ol.innerHTML = '';
-        Object.values(list).forEach(x => { 
+        Object.values(list).forEach(x => {
           const li = document.createElement('li');
-          // FIX: Dùng formatTime mới để hiển thị Elapsed Time (3 chữ số)
-          li.innerText = x.name + ' (' + formatTime(x.ts, buzzStartTime) + ')'; 
+          li.innerText = `${x.name} (${formatTime(x.ts, buzzStartTime)})`;
           ol.appendChild(li);
         });
       });
 
-      // GÁN CÁC HÀM XỬ LÝ NÚT BẤM SAU KHI TẠO PHÒNG
-      
-      // Đáp án
+      // === GẮN SỰ KIỆN CHO CÁC NÚT ===
       document.getElementById('lockAnswers').onclick = lockAnswers;
-      document.getElementById('unlockAnswersLimited').onclick = unlockAnswersLimited; 
-      document.getElementById('unlockAnswersPermanent').onclick = unlockAnswersPermanent; 
+      document.getElementById('unlockAnswersLimited').onclick = unlockAnswersLimited;
+      document.getElementById('unlockAnswersPermanent').onclick = unlockAnswersPermanent;
       document.getElementById('resetAnswers').onclick = () => {
-        set(ref(roomRef, 'answers'), {}).catch(e => showPopup("Lỗi reset. Kiểm tra Rules Firebase.", "error"));
-        showPopup("Đã reset danh sách đáp án.");
+        set(ref(roomRef, 'answers'), {}).then(() => showPopup("Đã reset đáp án."));
       };
 
-      // Chuông
-      document.getElementById('lockBuzz').onclick = lockBuzz; 
-      document.getElementById('unlockBuzzPermanent').onclick = unlockBuzzPermanent; 
+      document.getElementById('lockBuzz').onclick = lockBuzz;
       document.getElementById('unlockBuzzLimited').onclick = unlockBuzzLimited;
+      document.getElementById('unlockBuzzPermanent').onclick = unlockBuzz;
       document.getElementById('resetBuzz').onclick = () => {
-        set(ref(roomRef, 'buzzOrder'), []).catch(e => showPopup("Lỗi reset chuông. Kiểm tra Rules Firebase.", "error"));
-        showPopup("Đã reset thứ tự chuông.");
+        set(ref(roomRef, 'buzzOrder'), []).then(() => showPopup("Đã reset chuông."));
       };
     }
   </script>
