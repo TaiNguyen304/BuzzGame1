@@ -396,9 +396,7 @@
         answerTimeout = null;
       }
       
-      // *** SỬA LỖI QUAN TRỌNG:
       // Luôn dùng `durationSeconds` (thời gian CHUẨN từ server)
-      // KHÔNG đọc lại từ ô input
       const duration = durationSeconds;
 
       lockedAnswer = false;
@@ -429,10 +427,10 @@
       showPopup("Đã mở đáp án (Vĩnh viễn).");
     }
 
-    // Buttons - emit lên server
+    // ===== ĐÂY LÀ NƠI SỬA LỖI 15+5 =====
     document.getElementById('unlockAnswersLimited').onclick = () => {
       if (!currentRoom) return showPopup('Vui lòng tạo phòng trước.', 'error');
-      // *** SỬA LỖI QUAN TRỌNG:
+      
       // Chỉ đọc từ ô `answerDuration`
       const duration = parseInt(document.getElementById('answerDuration').value) || 0;
       socket.emit('host-toggle-answer', { roomCode: currentRoom, state: 'open', duration });
@@ -471,9 +469,7 @@
         buzzTimeout = null;
       }
 
-      // *** SỬA LỖI QUAN TRỌNG:
       // Luôn dùng `durationSeconds` (thời gian CHUẨN từ server)
-      // KHÔNG đọc lại từ ô input
       const duration = durationSeconds;
 
       lockedBuzz = false;
@@ -504,9 +500,10 @@
       showPopup("Đã mở chuông (Vĩnh viễn)!");
     }
 
+    // ===== ĐÂY LÀ NƠI SỬA LỖI 15+5 =====
     document.getElementById('unlockBuzzLimited').onclick = () => {
       if (!currentRoom) return showPopup('Vui lòng tạo phòng trước.', 'error');
-      // *** SỬA LỖI QUAN TRỌNG:
+      
       // Chỉ đọc từ ô `buzzDuration`
       const duration = parseInt(document.getElementById('buzzDuration').value) || 0;
       socket.emit('host-toggle-buzz', { roomCode: currentRoom, state: 'open', duration });
