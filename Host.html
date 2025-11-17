@@ -422,12 +422,19 @@
 
       // Chỉ đọc từ ô `answerDuration`
       const duration = parseInt(document.getElementById('answerDuration').value) || 0;
-      socket.emit('host-toggle-answer', { roomCode: currentRoom, state: 'open', duration });
+
+      // Gửi kèm startTime để các client dùng chung 1 mốc thời gian
+      const startTime = Date.now();
+
+      socket.emit('host-toggle-answer', { roomCode: currentRoom, state: 'open', duration, startTime });
     };
 
     document.getElementById('unlockAnswersPermanent').onclick = () => {
       if (!currentRoom) return showPopup('Vui lòng tạo phòng trước.', 'error');
-      socket.emit('host-toggle-answer', { roomCode: currentRoom, state: 'open', duration: 0 });
+
+      const startTime = Date.now();
+      // duration = 0 => vĩnh viễn (server / client hiểu)
+      socket.emit('host-toggle-answer', { roomCode: currentRoom, state: 'open', duration: 0, startTime });
     };
 
     document.getElementById('lockAnswers').onclick = () => {
@@ -479,17 +486,24 @@
     }
 
     // ===== ĐÂY LÀ NƠI SỬA LỖI 15+5 =====
-    document.getElementById('unlockBuzzLimited').onclick = () => {
+    document.getElementById('unlockAnswersLimited').onclick = () => {
       if (!currentRoom) return showPopup('Vui lòng tạo phòng trước.', 'error');
 
-      // Chỉ đọc từ ô `buzzDuration`
-      const duration = parseInt(document.getElementById('buzzDuration').value) || 0;
-      socket.emit('host-toggle-buzz', { roomCode: currentRoom, state: 'open', duration });
+      // Chỉ đọc từ ô `answerDuration`
+      const duration = parseInt(document.getElementById('answerDuration').value) || 0;
+
+      // Gửi kèm startTime để các client dùng chung 1 mốc thời gian
+      const startTime = Date.now();
+
+      socket.emit('host-toggle-answer', { roomCode: currentRoom, state: 'open', duration, startTime });
     };
 
-    document.getElementById('unlockBuzzPermanent').onclick = () => {
+    document.getElementById('unlockAnswersPermanent').onclick = () => {
       if (!currentRoom) return showPopup('Vui lòng tạo phòng trước.', 'error');
-      socket.emit('host-toggle-buzz', { roomCode: currentRoom, state: 'open', duration: 0 });
+
+      const startTime = Date.now();
+      // duration = 0 => vĩnh viễn (server / client hiểu)
+      socket.emit('host-toggle-answer', { roomCode: currentRoom, state: 'open', duration: 0, startTime });
     };
 
     document.getElementById('lockBuzz').onclick = () => {
