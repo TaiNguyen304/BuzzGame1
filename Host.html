@@ -395,25 +395,14 @@
         clearTimeout(answerTimeout);
         answerTimeout = null;
       }
-      
+
       // Luôn dùng `durationSeconds` (thời gian CHUẨN từ server)
       const duration = durationSeconds;
 
       lockedAnswer = false;
       answerStartTime = startTimeFromServer || Date.now();
       updateStatusDisplay();
-      showPopup(`Đã mở đáp án trong ${duration} giây!`); // Popup "Mở"
-
-      if (duration > 0) {
-        const now = Date.now();
-        const elapsedSinceStart = Math.max(0, (now - answerStartTime));
-        const remaining = Math.max(0, duration * 1000 - elapsedSinceStart);
-
-        answerTimeout = setTimeout(() => {
-          showPopup("Hết giờ. Đáp án đã tự động khóa."); // Popup "Hết giờ"
-          lockAnswersLocal();
-        }, remaining);
-      }
+      showPopup(`Đã mở đáp án trong ${duration} giây!`);
     }
 
     function unlockAnswersLocalPermanent(startTimeFromServer = null) {
@@ -430,7 +419,7 @@
     // ===== ĐÂY LÀ NƠI SỬA LỖI 15+5 =====
     document.getElementById('unlockAnswersLimited').onclick = () => {
       if (!currentRoom) return showPopup('Vui lòng tạo phòng trước.', 'error');
-      
+
       // Chỉ đọc từ ô `answerDuration`
       const duration = parseInt(document.getElementById('answerDuration').value) || 0;
       socket.emit('host-toggle-answer', { roomCode: currentRoom, state: 'open', duration });
@@ -475,18 +464,7 @@
       lockedBuzz = false;
       buzzStartTime = startTimeFromServer || Date.now();
       updateStatusDisplay();
-      showPopup(`Đã mở chuông trong ${duration} giây!`); // Popup "Mở"
-
-      if (duration > 0) {
-        const now = Date.now();
-        const elapsedSinceStart = Math.max(0, (now - buzzStartTime));
-        const remaining = Math.max(0, duration * 1000 - elapsedSinceStart);
-
-        buzzTimeout = setTimeout(() => {
-          showPopup("Hết giờ. Chuông đã tự động khóa."); // Popup "Hết giờ"
-          lockBuzzLocal();
-        }, remaining);
-      }
+      showPopup(`Đã mở chuông trong ${duration} giây!`);
     }
 
     function unlockBuzzLocalPermanent(startTimeFromServer = null) {
@@ -503,7 +481,7 @@
     // ===== ĐÂY LÀ NƠI SỬA LỖI 15+5 =====
     document.getElementById('unlockBuzzLimited').onclick = () => {
       if (!currentRoom) return showPopup('Vui lòng tạo phòng trước.', 'error');
-      
+
       // Chỉ đọc từ ô `buzzDuration`
       const duration = parseInt(document.getElementById('buzzDuration').value) || 0;
       socket.emit('host-toggle-buzz', { roomCode: currentRoom, state: 'open', duration });
