@@ -225,10 +225,7 @@
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
   <script>
-    // === CONFIG ===
     const SOCKET_SERVER_URL = "https://buzzgame1-1.onrender.com";
-    // ============================================================
-
     const socket = io(SOCKET_SERVER_URL, { autoConnect: true });
 
     let answers = [];
@@ -239,30 +236,26 @@
     let buzzStartTime = 0;
     let currentRoom = null;
 
-    function formatTime(timestamp, startTime) {
-      if (!startTime) return '∞';
-      const elapsed = Math.max(0, timestamp - startTime);
-      return (elapsed / 1000).toFixed(3) + 's';
+    function formatTime(ts, start) {
+      if (!start) return "∞";
+      return ((ts - start) / 1000).toFixed(3) + "s";
     }
 
-    function showPopup(message, type = 'success') {
-      const popup = document.getElementById('popupMessage');
-      popup.innerText = message;
-      popup.classList.toggle('error', type === 'error');
-      popup.style.opacity = '0';
-      popup.style.top = '20px';
-      void popup.offsetHeight;
-      popup.style.opacity = '1';
-      popup.style.top = '40px';
-      setTimeout(() => {
-        popup.style.opacity = '0';
-        popup.style.top = '20px';
-      }, 3000);
+    function showPopup(msg, type = "success") {
+      const p = document.getElementById("popupMessage");
+      p.innerText = msg;
+      p.classList.toggle("error", type === "error");
+      p.style.opacity = "0";
+      p.style.top = "20px";
+      void p.offsetHeight;
+      p.style.opacity = "1";
+      p.style.top = "40px";
+      setTimeout(() => { p.style.opacity = "0"; p.style.top = "20px"; }, 3000);
     }
 
     function renderAnswers() {
-      const tbl = document.getElementById('tblAnswers');
-      tbl.innerHTML = '<tr><th>Tên</th><th>Đáp án</th><th>Thời gian</th></tr>';
+      const tbl = document.getElementById("tblAnswers");
+      tbl.innerHTML = `<tr><th>Tên</th><th>Đáp án</th><th>Thời gian</th></tr>`;
       answers.sort((a, b) => a.ts - b.ts).forEach(x => {
         const tr = tbl.insertRow();
         tr.insertCell().innerText = x.name;
@@ -272,117 +265,127 @@
     }
 
     function renderBuzzList() {
-      const ol = document.getElementById('buzzList');
-      ol.innerHTML = '';
+      const ol = document.getElementById("buzzList");
+      ol.innerHTML = "";
       buzzOrder.forEach(x => {
-        const li = document.createElement('li');
+        const li = document.createElement("li");
         li.innerText = `${x.name} (${formatTime(x.ts, buzzStartTime)})`;
         ol.appendChild(li);
       });
     }
 
     function updateStatusDisplay() {
-      document.getElementById('statusAnswer').className = lockedAnswer ? 'status-box locked' : 'status-box open';
-      document.getElementById('statusAnswer').innerText = lockedAnswer ? 'Đáp án: 🔒 Đang khóa' : 'Đáp án: 🔓 Đang mở';
-      document.getElementById('statusBuzz').className = lockedBuzz ? 'status-box locked' : 'status-box open';
-      document.getElementById('statusBuzz').innerText = lockedBuzz ? 'Chuông: 🚫 Đang khóa' : 'Chuông: 🔔 Đang mở';
+      const sA = document.getElementById("statusAnswer");
+      const sB = document.getElementById("statusBuzz");
+      sA.className = lockedAnswer ? "status-box locked" : "status-box open";
+      sA.innerText = lockedAnswer ? "Đáp án: 🔒 Đang khóa" : "Đáp án: 🔓 Đang mở";
+
+      sB.className = lockedBuzz ? "status-box locked" : "status-box open";
+      sB.innerText = lockedBuzz ? "Chuông: 🚫 Đang khóa" : "Chuông: 🔔 Đang mở";
     }
 
-    // =============== TẠO PHÒNG ===============
-    document.getElementById('btnCreate').onclick = () => {
+    // ========== Tạo phòng ==========
+    document.getElementById("btnCreate").onclick = () => {
       const code = Math.floor(100000 + Math.random() * 900000);
-      socket.emit('host-create-room', code);
+      socket.emit("host-create-room", code);
     };
 
-    socket.on('room-created', (code) => {
+    socket.on("room-created", code => {
       currentRoom = code;
-      document.getElementById('roomInfo').innerHTML = `🔑 <b>Mã phòng:</b> <span style="color:black;font-size:1.5em;">${code}</span>`;
-      showPopup("Tạo phòng thành công!");
-      answers = []; buzzOrder = [];
-      renderAnswers(); renderBuzzList();
+      document.getElementById("roomInfo").innerHTML =
+        `🔑 <b>Mã phòng:</b> <span style="font-size:1.5em">${code}</span>`;
+      answers = [];
+      buzzOrder = [];
+      renderAnswers();
+      renderBuzzList();
       updateStatusDisplay();
+      showPopup("Tạo phòng thành công!");
     });
 
-    // =============== NHẬN DỮ LIỆU TỪ SERVER ===============
-    socket.on('host-new-answer', data => {
-      const idx = answers.findIndex(a => a.name === data.name);
-      if (idx >= 0) answers[idx] = data; else answers.push(data);
+    // ========== Nhận dữ liệu ==========
+    socket.on("host-new-answer", data => {
+      const idx = answers.findIndex(x => x.name === data.name);
+      if (idx >= 0) answers[idx] = data;
+      else answers.push(data);
       renderAnswers();
     });
 
-    socket.on('host-new-buzz', data => {
+    socket.on("host-new-buzz", data => {
       buzzOrder.push(data);
       renderBuzzList();
     });
 
-    // =============== ĐIỀU KHIỂN ĐÁP ÁN ===============
-    document.getElementById('unlockAnswersLimited').onclick = () => {
-      if (!currentRoom) return showPopup('Tạo phòng trước!', 'error');
-      const duration = Math.max(1, parseInt(document.getElementById('answerDuration').value) || 0);
-      const startTime = Date.now();
-      socket.emit('host-toggle-answer', { roomCode: currentRoom, state: 'open', duration, startTime });
+    // ========== Điều khiển Đáp án ==========
+    document.getElementById("unlockAnswersLimited").onclick = () => {
+      const duration = Math.max(1, parseInt(answerDuration.value) || 0);
+      socket.emit("host-toggle-answer", {
+        roomCode: currentRoom,
+        state: "open",
+        duration
+      });
     };
 
-    document.getElementById('unlockAnswersPermanent').onclick = () => {
-      if (!currentRoom) return showPopup('Tạo phòng trước!', 'error');
-      const startTime = Date.now();
-      socket.emit('host-toggle-answer', { roomCode: currentRoom, state: 'open', duration: 0, startTime });
+    document.getElementById("unlockAnswersPermanent").onclick = () => {
+      socket.emit("host-toggle-answer", {
+        roomCode: currentRoom,
+        state: "open",
+        duration: 0
+      });
     };
 
-    document.getElementById('lockAnswers').onclick = () => {
-      if (!currentRoom) return showPopup('Tạo phòng trước!', 'error');
-      socket.emit('host-toggle-answer', { roomCode: currentRoom, state: 'locked' });
+    document.getElementById("lockAnswers").onclick = () => {
+      socket.emit("host-toggle-answer", {
+        roomCode: currentRoom,
+        state: "locked"
+      });
     };
 
-    document.getElementById('resetAnswers').onclick = () => {
+    document.getElementById("resetAnswers").onclick = () => {
       answers = [];
       renderAnswers();
       showPopup("Đã reset đáp án");
     };
 
-    // =============== ĐIỀU KHIỂN CHUÔNG (ĐÃ SỬA) ===============
-    document.getElementById('unlockBuzzLimited').onclick = () => {
-      if (!currentRoom) return showPopup('Tạo phòng trước!', 'error');
-      const duration = Math.max(1, parseInt(document.getElementById('buzzDuration').value) || 0);
-      const startTime = Date.now();
-      socket.emit('host-toggle-buzz', { roomCode: currentRoom, state: 'open', duration, startTime });
+    // ========== Điều khiển Chuông ==========
+    document.getElementById("unlockBuzzLimited").onclick = () => {
+      const duration = Math.max(1, parseInt(buzzDuration.value) || 0);
+      socket.emit("host-toggle-buzz", {
+        roomCode: currentRoom,
+        state: "open",
+        duration
+      });
     };
 
-    document.getElementById('unlockBuzzPermanent').onclick = () => {
-      if (!currentRoom) return showPopup('Tạo phòng trước!', 'error');
-      const startTime = Date.now();
-      socket.emit('host-toggle-buzz', { roomCode: currentRoom, state: 'open', duration: 0, startTime });
+    document.getElementById("unlockBuzzPermanent").onclick = () => {
+      socket.emit("host-toggle-buzz", { roomCode: currentRoom, state: "open", duration: 0 });
     };
 
-    document.getElementById('lockBuzz').onclick = () => {
-      if (!currentRoom) return showPopup('Tạo phòng trước!', 'error');
-      socket.emit('host-toggle-buzz', { roomCode: currentRoom, state: 'locked' });
+    document.getElementById("lockBuzz").onclick = () => {
+      socket.emit("host-toggle-buzz", { roomCode: currentRoom, state: "locked" });
     };
 
-    document.getElementById('resetBuzz').onclick = () => {
+    document.getElementById("resetBuzz").onclick = () => {
       buzzOrder = [];
       renderBuzzList();
       showPopup("Đã reset chuông");
     };
 
-    // =============== ĐỒNG BỘ TRẠNG THÁI TỪ SERVER ===============
-    socket.on('answer-status-changed', ({ state, duration, startTime }) => {
-      lockedAnswer = state === 'locked';
-      if (state === 'open') answerStartTime = startTime || Date.now();
-      else answerStartTime = 0;
+    // ========== Đồng bộ trạng thái ==========
+    socket.on("answer-status-changed", ({ state, duration, startTime }) => {
+      lockedAnswer = state === "locked";
+      answerStartTime = state === "open" ? (startTime || 0) : 0;
       updateStatusDisplay();
     });
 
-    socket.on('buzz-status-changed', ({ state, duration, startTime }) => {
-      lockedBuzz = state === 'locked';
-      if (state === 'open') buzzStartTime = startTime || Date.now();
-      else buzzStartTime = 0;
+    socket.on("buzz-status-changed", ({ state, duration, startTime }) => {
+      lockedBuzz = state === "locked";
+      buzzStartTime = state === "open" ? (startTime || 0) : 0;
       updateStatusDisplay();
     });
 
-    // Init
     updateStatusDisplay();
   </script>
+
 </body>
 
 </html>
