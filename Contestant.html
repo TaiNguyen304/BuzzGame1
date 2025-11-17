@@ -215,6 +215,7 @@ function startAnswerCountdown(startTime, duration) {
     }, 50);
 }
 
+// 🐛 Đã sửa lỗi: Luôn mở khóa nút chuông khi Host mở chuông mới.
 function startBuzzCountdown(startTime, duration) {
     if (buzzInterval) clearInterval(buzzInterval);
 
@@ -230,6 +231,9 @@ function startBuzzCountdown(startTime, duration) {
 
     const end = startTime + (duration - 5) * 1000;
     lockedBuzz = false;
+    
+    // 🔥 FIX: Khi Host mở chuông mới (kể cả sau khi reset), 
+    // đảm bảo nút chuông của thí sinh được mở lại.
     btn.disabled = false;
     btn.classList.remove("locked");
 
@@ -321,7 +325,8 @@ btnBuzz.onclick = () => {
         roomCode: parseInt(myRoom),
         name: myName
     });
-
+    
+    // Khóa nút ngay sau khi bấm (theo yêu cầu 1 lần/mỗi lần mở)
     btnBuzz.classList.add("locked");
     btnBuzz.disabled = true;
 
