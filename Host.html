@@ -171,6 +171,14 @@
       font-weight: bold;
       margin-right: 10px;
     }
+
+    /* Thêm style cho phần hiển thị thời gian chạy */
+    .time-elapsed-display {
+      font-size: 1.1em;
+      font-weight: bold;
+      margin-top: 10px;
+      height: 25px; /* Giữ chỗ để tránh nhảy layout */
+    }
   </style>
 </head>
 
@@ -183,7 +191,10 @@
   <div>
     <div class="status-box locked" id="statusAnswer">Đáp án: 🔒 Đang khóa</div>
     <div class="status-box locked" id="statusBuzz">Chuông: 🚫 Đang khóa</div>
-  </div><br>
+  </div>
+  
+  <div class="time-elapsed-display" id="answerTimeElapsed"></div>
+  <div class="time-elapsed-display" id="buzzTimeElapsed"></div>
 
   <div class="control-group">
     <div class="control-item">
@@ -234,10 +245,18 @@
     let lockedBuzz = true;
     let answerStartTime = 0;
     let buzzStartTime = 0;
+    let answerDuration_host = 0; // Thêm: Lưu trữ thời lượng đáp án
+    let buzzDuration_host = 0; // Thêm: Lưu trữ thời lượng chuông
+    let hostTimerInterval = null; // Thêm: Interval để cập nhật thời gian
     let currentRoom = null;
 
+    // Hàm định dạng thời gian (Dùng chung cho cả elapsed và remaining)
+    function format(ms) {
+        return (Math.max(0,ms)/1000).toFixed(3)+"s";
+    }
+
     function formatTime(ts, start) {
-      if (!start) return "∞";
+      if (!start) return "N/A";
       return ((ts - start) / 1000).toFixed(3) + "s";
     }
 
@@ -284,6 +303,34 @@
       sB.innerText = lockedBuzz ? "Chuông: 🚫 Đang khóa" : "Chuông: 🔔 Đang mở";
     }
 
+    // THÊM: Hàm cập nhật hiển thị thời gian trôi qua/còn lại theo thời gian thực
+    function updateElapsedDisplay() {
+        const now = Date.now();
+        const aDisp = document.getElementById("answerTimeElapsed");
+        const bDisp = document.getElementById("buzzTimeElapsed");
+
+        // Answer Time
+        if (!lockedAnswer && answerDuration_host === 0 && answerStartTime > 0) {
+            aDisp.innerHTML = `Thời gian đáp án đã mở: <span style="color:blue;">${format(now - answerStartTime)}</span>`;
+        } else if (!lockedAnswer && answerDuration_host > 0 && answerStartTime > 0) {
+            const remain = answerStartTime + answerDuration_host * 1000 - now;
+            aDisp.innerHTML = `Thời gian đáp án còn lại: <span style="color:red;">${format(remain)}</span>`;
+        } else {
+            aDisp.innerHTML = "";
+        }
+
+        // Buzz Time
+        if (!lockedBuzz && buzzDuration_host === 0 && buzzStartTime > 0) {
+            bDisp.innerHTML = `Thời gian chuông đã mở: <span style="color:blue;">${format(now - buzzStartTime)}</span>`;
+        } else if (!lockedBuzz && buzzDuration_host > 0 && buzzStartTime > 0) {
+            const remain = buzzStartTime + buzzDuration_host * 1000 - now;
+            bDisp.innerHTML = `Thời gian chuông còn lại: <span style="color:red;">${format(remain)}</span>`;
+        } else {
+            bDisp.innerHTML = "";
+        }
+    }
+
+
     // ========== Tạo phòng ==========
     document.getElementById("btnCreate").onclick = () => {
       const code = Math.floor(100000 + Math.random() * 900000);
@@ -300,6 +347,10 @@
       renderBuzzList();
       updateStatusDisplay();
       showPopup("Tạo phòng thành công!");
+      
+      // BẮT ĐẦU TIMER
+      if (hostTimerInterval) clearInterval(hostTimerInterval);
+      hostTimerInterval = setInterval(updateElapsedDisplay, 50);
     });
 
     // ========== Nhận dữ liệu ==========
@@ -317,6 +368,7 @@
 
     // ========== Điều khiển Đáp án ==========
     document.getElementById("unlockAnswersLimited").onclick = () => {
+      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
       const duration = Math.max(1, parseInt(answerDuration.value) || 0);
       socket.emit("host-toggle-answer", {
         roomCode: currentRoom,
@@ -326,6 +378,7 @@
     };
 
     document.getElementById("unlockAnswersPermanent").onclick = () => {
+      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
       socket.emit("host-toggle-answer", {
         roomCode: currentRoom,
         state: "open",
@@ -334,6 +387,7 @@
     };
 
     document.getElementById("lockAnswers").onclick = () => {
+      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
       socket.emit("host-toggle-answer", {
         roomCode: currentRoom,
         state: "locked"
@@ -341,6 +395,7 @@
     };
 
     document.getElementById("resetAnswers").onclick = () => {
+      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
       answers = [];
       renderAnswers();
       showPopup("Đã reset đáp án");
@@ -348,6 +403,7 @@
 
     // ========== Điều khiển Chuông ==========
     document.getElementById("unlockBuzzLimited").onclick = () => {
+      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
       const duration = Math.max(1, parseInt(buzzDuration.value) || 0);
       socket.emit("host-toggle-buzz", {
         roomCode: currentRoom,
@@ -357,14 +413,17 @@
     };
 
     document.getElementById("unlockBuzzPermanent").onclick = () => {
+      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
       socket.emit("host-toggle-buzz", { roomCode: currentRoom, state: "open", duration: 0 });
     };
 
     document.getElementById("lockBuzz").onclick = () => {
+      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
       socket.emit("host-toggle-buzz", { roomCode: currentRoom, state: "locked" });
     };
 
     document.getElementById("resetBuzz").onclick = () => {
+      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
       buzzOrder = [];
       renderBuzzList();
       showPopup("Đã reset chuông");
@@ -374,13 +433,17 @@
     socket.on("answer-status-changed", ({ state, duration, startTime }) => {
       lockedAnswer = state === "locked";
       answerStartTime = state === "open" ? (startTime || 0) : 0;
+      answerDuration_host = duration || 0; // Lưu duration
       updateStatusDisplay();
+      updateElapsedDisplay();
     });
 
     socket.on("buzz-status-changed", ({ state, duration, startTime }) => {
       lockedBuzz = state === "locked";
       buzzStartTime = state === "open" ? (startTime || 0) : 0;
+      buzzDuration_host = duration || 0; // Lưu duration
       updateStatusDisplay();
+      updateElapsedDisplay();
     });
 
     updateStatusDisplay();

@@ -11,7 +11,7 @@ const io = require("socket.io")(http, {
 });
 
 let rooms = {};   
-// roomCode -> { hostId, answers:[], buzz:[], statusAnswer, statusBuzz, answerStartTime, buzzStartTime, timers }
+// roomCode -> { hostId, users: [{id, name}], answers:[], buzz:[], statusAnswer, statusBuzz, answerStartTime, buzzStartTime, timers }
 
 io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
@@ -21,6 +21,7 @@ io.on("connection", (socket) => {
         if (!rooms[roomCode]) {
             rooms[roomCode] = {
                 hostId: socket.id,
+                users: [], // Đã thêm: Danh sách người dùng
                 answers: [],
                 buzz: [],
                 statusAnswer: "locked",
@@ -40,10 +41,20 @@ io.on("connection", (socket) => {
 
     // ========================= USER JOIN =========================
     socket.on("user-join-room", ({ roomCode, name }) => {
-        if (!rooms[roomCode]) {
+        const room = rooms[roomCode];
+        if (!room) {
             socket.emit("join-failed", "Phòng không tồn tại.");
             return;
         }
+
+        // VALIDATE: Kiểm tra tên người dùng bị trùng (CÓ phân biệt chữ hoa/thường)
+        if (room.users.some(user => user.name === name)) {
+            socket.emit("join-failed", `Tên "${name}" đã được sử dụng trong phòng này. Vui lòng chọn tên khác.`);
+            return;
+        }
+
+        // ADD USER and proceed with join
+        room.users.push({ id: socket.id, name });
         socket.join(roomCode);
         socket.emit("join-success", { roomCode });
         console.log(`${name} joined room ${roomCode}`);
@@ -63,13 +74,15 @@ io.on("connection", (socket) => {
         if (state === "open") {
             const now = Date.now();
             room.statusAnswer = "open";
-            room.answerStartTime = duration > 0 ? now : 0;
+            
+            // SỬA LỖI: Luôn đặt startTime là now, kể cả khi duration = 0
+            room.answerStartTime = now;
             room.answerDuration = duration;
 
             io.to(roomCode).emit("answer-status-changed", {
                 state: "open",
                 duration,
-                startTime: duration > 0 ? now : null
+                startTime: now
             });
 
             if (duration > 0) {
@@ -101,14 +114,16 @@ io.on("connection", (socket) => {
         if (state === "open") {
             const now = Date.now();
             room.statusBuzz = "open";
-            room.buzzStartTime = duration > 0 ? now : 0;
+            
+            // SỬA LỖI: Luôn đặt startTime là now, kể cả khi duration = 0
+            room.buzzStartTime = now;
             room.buzzDuration = duration;
             room.buzz = []; // reset danh sách buzz
 
             io.to(roomCode).emit("buzz-status-changed", {
                 state: "open",
                 duration,
-                startTime: duration > 0 ? now : null
+                startTime: now
             });
 
             if (duration > 0) {
@@ -157,6 +172,16 @@ io.on("connection", (socket) => {
 
     socket.on("disconnect", () => {
         console.log("Disconnected:", socket.id);
+        // Xóa người dùng khỏi danh sách users của phòng
+        for (const roomCode in rooms) {
+            const room = rooms[roomCode];
+            const initialCount = room.users.length;
+            room.users = room.users.filter(user => user.id !== socket.id);
+            if (room.users.length < initialCount) {
+                console.log(`User ${socket.id} left room ${roomCode}`);
+                break;
+            }
+        }
     });
 });
 
