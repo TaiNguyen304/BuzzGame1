@@ -639,7 +639,7 @@
           answerStartTime = startTime || 0; 
           
           if (answerDuration_host > 0) {
-              answerEndTime_host = Date.now() + (answerDuration_host * 1000) - 5000;
+              answerEndTime_host = Date.now() + (answerDuration_host * 1000);
           } else {
               answerEndTime_host = 0;
           }
@@ -661,7 +661,7 @@
           
           if (buzzDuration_host > 0) {
               // Tính thời điểm kết thúc THEO ĐỒNG HỒ HOST
-              buzzEndTime_host = Date.now() + (buzzDuration_host * 1000) - 5000;
+              buzzEndTime_host = Date.now() + (buzzDuration_host * 1000);
           } else {
               buzzEndTime_host = 0; // Mở vĩnh viễn, không đếm ngược
           }
