@@ -660,11 +660,13 @@
       if (host && host.id) {
         const li = document.createElement("li");
         const isSelf = host.id === socket.id;
-        li.innerHTML = `**${isSelf ? `(Bạn) ` : ''}** ${host.name || 'Host'} <span class="role-host">(HOST)</span>`;
+        // Đã sửa: Loại bỏ ** và thay bằng <b>
+        li.innerHTML = `${isSelf ? `(Bạn) ` : ''}<b>${host.name || 'Host'}</b> <span class="role-host">(HOST)</span>`;
         ul.appendChild(li);
       } else {
         const li = document.createElement("li");
-        li.innerHTML = `**Host** <span class="role-host">(Chưa kết nối)</span>`;
+        // Đã sửa: Loại bỏ ** và thay bằng <b>
+        li.innerHTML = `<b>Host</b> <span class="role-host">(Chưa kết nối)</span>`;
         ul.appendChild(li);
       }
       
@@ -672,14 +674,16 @@
       managers.forEach(m => {
         const li = document.createElement("li");
         const isSelf = m.id === socket.id;
-        li.innerHTML = `**${isSelf ? `(Bạn) ` : ''}** ${m.name} <span class="role-manager">(Quản lý)</span>`;
+        // Đã sửa: Loại bỏ ** và thay bằng <b>
+        li.innerHTML = `${isSelf ? `(Bạn) ` : ''}<b>${m.name}</b> <span class="role-manager">(Quản lý)</span>`;
         ul.appendChild(li);
       });
 
       // 3. Contestants
       contestants.forEach(c => {
         const li = document.createElement("li");
-        li.innerHTML = `**${c.name}** <span class="role-contestant">(Thí sinh)</span>`;
+        // Đã sửa: Loại bỏ ** và thay bằng <b>
+        li.innerHTML = `<b>${c.name}</b> <span class="role-contestant">(Thí sinh)</span>`;
         ul.appendChild(li);
       });
 
