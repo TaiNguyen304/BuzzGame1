@@ -449,22 +449,22 @@
       if (ms < 0) ms = 0;
       const totalSeconds = Math.floor(ms / 1000);
       const milliseconds = ms % 1000; // Lấy 3 chữ số thập phân
-      // Trả về định dạng giây.tích tắc (ss.ttt)
-      return `${totalSeconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
+      // Trả về định dạng giây.tích tắc (ss.ttt) + "s"
+      return `${totalSeconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}s`;
     }
 
     // Hàm format thời gian (dùng cho xuất Excel và hiển thị bảng)
     function formatTime(ts, startTime) {
-        if (startTime === 0) return "00.000"; // Nếu chưa có thời gian bắt đầu
+        if (startTime === 0) return "00.000s"; // Nếu chưa có thời gian bắt đầu
         
         const elapsed = ts - startTime; // Khoảng thời gian tính từ lúc bắt đầu
-        if (elapsed < 0) return "00.000 (Lỗi)";
+        if (elapsed < 0) return "00.000s (Lỗi)";
         
         const totalSeconds = Math.floor(elapsed / 1000);
         const milliseconds = elapsed % 1000; // Lấy 3 chữ số thập phân
         
-        // Trả về định dạng giây.tích tắc (ss.ttt)
-        return `${totalSeconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
+        // Trả về định dạng giây.tích tắc (ss.ttt) + "s"
+        return `${totalSeconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}s`;
     }
 
     // Hàm cập nhật hiển thị bảng đáp án
@@ -579,8 +579,8 @@
         ws1_data.push([
           x.name,
           x.answer,
-          // Dùng startTime (gốc) để tính toán
-          formatTime(x.ts, answerStartTime) // Dùng hàm formatTime đã cập nhật
+          // Dùng startTime (gốc) để tính toán. KHÔNG THÊM 's' vì Excel nên là số
+          formatTime(x.ts, answerStartTime).replace('s', '')
         ]);
       });
 
@@ -591,8 +591,8 @@
       buzzOrder.forEach(x => {
         ws2_data.push([
           x.name,
-          // Dùng startTime (gốc) để tính toán
-          formatTime(x.ts, buzzStartTime) // Dùng hàm formatTime đã cập nhật
+          // Dùng startTime (gốc) để tính toán. KHÔNG THÊM 's' vì Excel nên là số
+          formatTime(x.ts, buzzStartTime).replace('s', '')
         ]);
       });
 
@@ -751,7 +751,7 @@
         }
       }
       updateStatusDisplay();
-      showPopup(`Đáp án: ${lockedAnswer ? 'Đã Khóa' : 'Đã Mở'} (Thời gian: ${duration ? duration + 's' : 'Vĩnh viễn'})`);
+      showPopup(`Đáp án: ${lockedAnswer ? 'Đã Khóa' : 'Đã Mở'}`);
     });
 
     socket.on("buzz-status-changed", ({ state, duration, startTime }) => {
@@ -768,7 +768,7 @@
         }
       }
       updateStatusDisplay();
-      showPopup(`Chuông: ${lockedBuzz ? 'Đã Khóa' : 'Đã Mở'} (Thời gian: ${duration ? duration + 's' : 'Vĩnh viễn'})`);
+      showPopup(`Chuông: ${lockedBuzz ? 'Đã Khóa' : 'Đã Mở'}`);
     });
 
     // ========== TẠO PHÒNG ==========
@@ -840,4 +840,3 @@
 </body>
 
 </html>
-
