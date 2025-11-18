@@ -454,22 +454,22 @@
 
       // Answer Time
       if (!lockedAnswer && answerDuration_host === 0 && answerStartTime > 0) {
-        aDisp.innerHTML = `Thời gian đáp án đã trôi qua: <span style="color:green;">${format(now - answerStartTime)}</span> (Vĩnh viễn)`;
+        
       } else if (!lockedAnswer && answerDuration_host > 0 && answerStartTime > 0) {
         // - 5000 là khoảng buffer 5 giây được trừ ở server
         const remain = answerStartTime + answerDuration_host * 1000 - now - 5000;
-        aDisp.innerHTML = `Thời gian đáp án còn lại: <span style="color:red;">${format(remain)}</span>`;
+        aDisp.innerHTML = `Thời gian gửi đáp án còn lại: <span style="color:red;">${format(remain)}</span>`;
       } else {
         aDisp.innerHTML = "";
       }
 
       // Buzz Time
       if (!lockedBuzz && buzzDuration_host === 0 && buzzStartTime > 0) {
-        bDisp.innerHTML = `Thời gian chuông đã trôi qua: <span style="color:green;">${format(now - buzzStartTime)}</span> (Vĩnh viễn)`;
+        
       } else if (!lockedBuzz && buzzDuration_host > 0 && buzzStartTime > 0) {
         // - 5000 là khoảng buffer 5 giây được trừ ở server
         const remain = buzzStartTime + buzzDuration_host * 1000 - now - 5000;
-        bDisp.innerHTML = `Thời gian chuông còn lại: <span style="color:red;">${format(remain)}</span>`;
+        bDisp.innerHTML = `Thời gian bấm chuông còn lại: <span style="color:red;">${format(remain)}</span>`;
       } else {
         bDisp.innerHTML = "";
       }
