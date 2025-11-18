@@ -449,22 +449,22 @@
       if (ms < 0) ms = 0;
       const totalSeconds = Math.floor(ms / 1000);
       const milliseconds = ms % 1000; // Lấy 3 chữ số thập phân
-      // Trả về định dạng giây.tích tắc (ss.ttt) + "s"
-      return `${totalSeconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}s`;
+      // Bỏ padStart(2, '0') để không có số 0 đứng đầu (ví dụ: 9.234s thay vì 09.234s)
+      return `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
     }
 
     // Hàm format thời gian (dùng cho xuất Excel và hiển thị bảng)
     function formatTime(ts, startTime) {
-        if (startTime === 0) return "00.000s"; // Nếu chưa có thời gian bắt đầu
+        if (startTime === 0) return "0.000s"; // Nếu chưa có thời gian bắt đầu
         
         const elapsed = ts - startTime; // Khoảng thời gian tính từ lúc bắt đầu
-        if (elapsed < 0) return "00.000s (Lỗi)";
+        if (elapsed < 0) return "0.000s (Lỗi)";
         
         const totalSeconds = Math.floor(elapsed / 1000);
         const milliseconds = elapsed % 1000; // Lấy 3 chữ số thập phân
         
-        // Trả về định dạng giây.tích tắc (ss.ttt) + "s"
-        return `${totalSeconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}s`;
+        // Bỏ padStart(2, '0') để không có số 0 đứng đầu
+        return `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
     }
 
     // Hàm cập nhật hiển thị bảng đáp án
@@ -516,7 +516,7 @@
       } else if (!lockedAnswer && answerDuration_host > 0 && answerEndTime_host > 0) {
         // THAY ĐỔI: Dùng answerEndTime_host (tính theo đồng hồ local)
         const remain = answerEndTime_host - now;
-        aDisp.innerHTML = `Thời gian đáp án còn lại: <span style="color:red;">${format(remain)}</span>`;
+        aDisp.innerHTML = `Thời gian gửi đáp án còn lại: <span style="color:red;">${format(remain)}</span>`;
       } else {
         aDisp.innerHTML = "";
       }
@@ -528,7 +528,7 @@
       } else if (!lockedBuzz && buzzDuration_host > 0 && buzzEndTime_host > 0) {
         // THAY ĐỔI: Dùng buzzEndTime_host (tính theo đồng hồ local)
         const remain = buzzEndTime_host - now;
-        bDisp.innerHTML = `Thời gian chuông còn lại: <span style="color:red;">${format(remain)}</span>`;
+        bDisp.innerHTML = `Thời gian bấm chuông còn lại: <span style="color:red;">${format(remain)}</span>`;
       } else {
         bDisp.innerHTML = "";
       }
