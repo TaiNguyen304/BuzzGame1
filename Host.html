@@ -384,6 +384,10 @@
   <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
 
   <script>
+    // ===================================================================
+    // ========== BẮT ĐẦU PHẦN SCRIPT ĐÃ SỬA LỖI =========================
+    // ===================================================================
+
     // SỬA: Dùng địa chỉ của server của bạn
     const SOCKET_SERVER_URL = "https://buzzgame1-1.onrender.com"; 
     const socket = io(SOCKET_SERVER_URL, { autoConnect: true });
@@ -425,7 +429,11 @@
 
     function renderAnswers() {
       const tbl = document.getElementById("tblAnswers");
-      tbl.innerHTML = `<tr><th>Tên</th><th>Đáp án</th><th>Thời gian</th></tr>`;
+      // Xóa các hàng cũ, giữ lại hàng tiêu đề
+      while (tbl.rows.length > 1) {
+          tbl.deleteRow(1);
+      }
+      
       answers.sort((a, b) => a.ts - b.ts).forEach(x => {
         const tr = tbl.insertRow(); // Sửa: Dùng insertRow()
         tr.insertCell().innerText = x.name;
@@ -465,6 +473,7 @@
           hostTimerInterval = null;
         }
       }
+      // Cập nhật hiển thị ngay lập tức
       updateElapsedDisplay();
     }
 
@@ -473,11 +482,12 @@
       const answerElapsedDisplay = document.getElementById("answerTimeElapsed");
       const buzzElapsedDisplay = document.getElementById("buzzTimeElapsed");
 
-      if (answerStartTime > 0) {
+      // Xử lý thời gian đáp án
+      if (!lockedAnswer && answerStartTime > 0) {
         const elapsed = now - answerStartTime;
         let display = `Thời gian mở: ${format(elapsed)}`;
         if (answerDuration_host > 0) {
-          const remaining = answerDuration_host * 1000 - elapsed;
+          const remaining = (answerStartTime + answerDuration_host * 1000) - now;
           display += ` (Còn lại: ${format(remaining)})`;
         }
         answerElapsedDisplay.innerText = display;
@@ -485,11 +495,12 @@
         answerElapsedDisplay.innerText = "";
       }
 
-      if (buzzStartTime > 0) {
+      // Xử lý thời gian chuông
+      if (!lockedBuzz && buzzStartTime > 0) {
         const elapsed = now - buzzStartTime;
         let display = `Thời gian mở: ${format(elapsed)}`;
         if (buzzDuration_host > 0) {
-          const remaining = buzzDuration_host * 1000 - elapsed;
+          const remaining = (buzzStartTime + buzzDuration_host * 1000) - now;
           display += ` (Còn lại: ${format(remaining)})`;
         }
         buzzElapsedDisplay.innerText = display;
@@ -501,16 +512,39 @@
 
     // ========================= NHẬN DỮ LIỆU TỪ SERVER =========================
 
-    // SỬA LỖI: Nhận dữ liệu answers và buzzOrder khi tạo phòng
-    socket.on("room-created", ({ roomCode, answers: serverAnswers, buzzOrder: serverBuzz }) => {
-      currentRoom = roomCode;
+    // SỬA LỖI: "Mã phòng undefined" khi tạo phòng
+    socket.on("room-created", (data) => {
+      let receivedRoomCode;
+      let serverAnswers = [];
+      let serverBuzz = [];
+
+      // Kiểm tra xem server gửi về object (mới) hay string (cũ)
+      if (typeof data === 'object' && data !== null && data.roomCode) {
+        // Trường hợp server gửi object (đã cập nhật)
+        receivedRoomCode = data.roomCode;
+        serverAnswers = data.answers || [];
+        serverBuzz = data.buzzOrder || [];
+      } else {
+        // Trường hợp server gửi string (phiên bản cũ)
+        receivedRoomCode = data;
+        // Vì server gửi string, chúng ta không thể tải lại kết quả cũ (nếu có)
+      }
+
+      // Gán mã phòng cho biến global
+      currentRoom = receivedRoomCode; 
+      
+      if (!currentRoom) {
+          showPopup("Lỗi: Không nhận được mã phòng từ server.", "error");
+          return;
+      }
+
       myRole = "Host";
       myName = "Host"; 
       document.getElementById("roomInfo").innerHTML =
-        `🔑 <b>Mã phòng:</b> <span style="font-size:1.5em">${roomCode}</span> | <b>Vai trò:</b> <span class="role-host">HOST</span>`;
+        `🔑 <b>Mã phòng:</b> <span style="font-size:1.5em">${currentRoom}</span> | <b>Vai trò:</b> <span class="role-host">HOST</span>`;
       
-      answers = serverAnswers || [];
-      buzzOrder = serverBuzz || [];
+      answers = serverAnswers;
+      buzzOrder = serverBuzz;
       
       answerStartTime = 0; 
       buzzStartTime = 0; 
@@ -527,10 +561,10 @@
       myRole = "Manager";
       myName = name;
       document.getElementById("roomInfo").innerHTML =
-        `🔑 <b>Mã phòng:</b> <span style="font-size:1.5em">${roomCode}</span> | <b>Vai trò:</b> <span class="role-manager">QUẢN LÝ (${name})</span>`;
+        `🔑 <b>Mã phòng:</b> <span style="font-size:1.5em">${roomCode}</span> | <b>Vai trò:</b> <span class="role-manager">QUẢN LÝ</span>`;
       
-      answers = serverAnswers || []; // <--- CẬP NHẬT: Gán dữ liệu đáp án từ server
-      buzzOrder = serverBuzz || []; // <--- CẬP NHẬT: Gán dữ liệu chuông từ server
+      answers = serverAnswers || [];
+      buzzOrder = serverBuzz || [];
       
       answerStartTime = 0; // Đồng bộ trạng thái khi Host/Manager join
       buzzStartTime = 0; // Đồng bộ trạng thái khi Host/Manager join
@@ -544,6 +578,9 @@
     socket.on("join-error", (msg) => {
       showPopup("Lỗi: " + msg, "error");
     });
+    
+    // SỬA LỖI: "join-manager-failed" (Sự kiện lỗi khi Quản lý join)
+    socket.on("join-manager-failed", msg => showPopup(msg, "error"));
 
     socket.on("host-new-answer", (record) => {
       // Cập nhật/Thêm đáp án mới nhất
@@ -572,18 +609,22 @@
     // ========== Đồng bộ trạng thái ==========
     socket.on("answer-status-changed", ({ state, duration, startTime }) => {
       lockedAnswer = state === "locked";
-      answerStartTime = state === "open" ? (startTime || 0) : 0;
       answerDuration_host = duration || 0; // Lưu duration
+      // SỬA LỖI: Chỉ reset/set startTime khi mở, giữ nguyên khi đóng
+      if (state === "open") {
+          answerStartTime = startTime || 0;
+      }
       updateStatusDisplay();
-      updateElapsedDisplay();
     });
 
     socket.on("buzz-status-changed", ({ state, duration, startTime }) => {
       lockedBuzz = state === "locked";
-      buzzStartTime = state === "open" ? (startTime || 0) : 0;
       buzzDuration_host = duration || 0; // Lưu duration
+      // SỬA LỖI: Chỉ reset/set startTime khi mở, giữ nguyên khi đóng
+      if (state === "open") {
+          buzzStartTime = startTime || 0;
+      }
       updateStatusDisplay();
-      updateElapsedDisplay();
     });
 
 
@@ -591,7 +632,12 @@
 
     // ========== Tạo phòng ==========
     document.getElementById("btnCreate").onclick = () => {
+      // SỬA LỖI: Ngăn tạo phòng nếu đã ở trong phòng
+      if (currentRoom) {
+          return showPopup(`Bạn đã ở trong phòng ${currentRoom}!`, "error");
+      }
       const roomCode = Math.floor(100000 + Math.random() * 900000).toString();
+      // Gửi string (Mã phòng) lên server
       socket.emit("host-create-room", roomCode);
     };
 
@@ -616,6 +662,7 @@
 
     // ========== Danh sách tham gia ==========
     document.getElementById("btnListUsers").onclick = () => {
+      // SỬA LỖI: Kiểm tra currentRoom trước khi gửi
       if (!currentRoom) return showPopup("Vui lòng tạo phòng hoặc tham gia phòng trước!", "error");
       socket.emit("host-request-userlist", currentRoom);
       document.getElementById("listPopup").style.display = "flex";
@@ -661,7 +708,8 @@
     const answerDuration = document.getElementById("answerDuration");
 
     document.getElementById("unlockAnswersLimited").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước! hoặc tham gia phòng quản lý", "error");
+      // SỬA LỖI: Kiểm tra currentRoom
+      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
       const duration = Math.max(1, parseInt(answerDuration.value) || 0);
       if (duration === 0) return showPopup("Vui lòng đặt thời gian > 0 cho chế độ Giới hạn!", "error");
       socket.emit("host-toggle-answer", {
@@ -672,29 +720,33 @@
     };
 
     document.getElementById("unlockAnswersPermanent").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước! hoặc tham gia phòng quản lý", "error");
+      // SỬA LỖI: Kiểm tra currentRoom
+      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
       socket.emit("host-toggle-answer", { roomCode: currentRoom, state: "open", duration: 0 });
     };
 
     document.getElementById("lockAnswers").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước! hoặc tham gia phòng quản lý", "error");
+      // SỬA LỖI: Kiểm tra currentRoom
+      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
       socket.emit("host-toggle-answer", { roomCode: currentRoom, state: "locked" });
     };
 
     document.getElementById("resetAnswers").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước! hoặc tham gia phòng quản lý", "error");
+      // SỬA LỖI: Kiểm tra currentRoom
+      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
       answers = [];
       renderAnswers();
       showPopup("Đã reset đáp án");
-      // Cần gửi tín hiệu reset về server nếu bạn muốn reset dữ liệu trên server
-      // Hiện tại code server.js chưa có sự kiện reset, chỉ reset cục bộ trên Host/Manager.
+      // Gửi sự kiện reset lên server (nếu server có xử lý)
+      // socket.emit("host-reset-answers", currentRoom);
     };
 
     // ========== Điều khiển Chuông ==========
     const buzzDuration = document.getElementById("buzzDuration");
 
     document.getElementById("unlockBuzzLimited").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước! hoặc tham gia phòng quản lý", "error");
+      // SỬA LỖI: Kiểm tra currentRoom
+      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
       const duration = Math.max(1, parseInt(buzzDuration.value) || 0);
       if (duration === 0) return showPopup("Vui lòng đặt thời gian > 0 cho chế độ Giới hạn!", "error");
       socket.emit("host-toggle-buzz", {
@@ -705,28 +757,32 @@
     };
 
     document.getElementById("unlockBuzzPermanent").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước! hoặc tham gia phòng quản lý", "error");
+      // SỬA LỖI: Kiểm tra currentRoom
+      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
       socket.emit("host-toggle-buzz", { roomCode: currentRoom, state: "open", duration: 0 });
     };
 
     document.getElementById("lockBuzz").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước! hoặc tham gia phòng quản lý", "error");
+      // SỬA LỖI: Kiểm tra currentRoom
+      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
       socket.emit("host-toggle-buzz", { roomCode: currentRoom, state: "locked" });
     };
 
     document.getElementById("resetBuzz").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước! hoặc tham gia phòng quản lý", "error");
+      // SỬA LỖI: Kiểm tra currentRoom
+      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
       buzzOrder = [];
       renderBuzzList();
       showPopup("Đã reset chuông");
-      // Cần gửi tín hiệu reset về server nếu bạn muốn reset dữ liệu trên server
-      // Hiện tại code server.js chưa có sự kiện reset, chỉ reset cục bộ trên Host/Manager.
+      // Gửi sự kiện reset lên server (nếu server có xử lý)
+      // socket.emit("host-reset-buzz", currentRoom);
     };
 
 
     // ========================= XUẤT KẾT QUẢ EXCEL =========================
 
     document.getElementById("btnExportResults").onclick = () => {
+      // SỬA LỖI: Kiểm tra currentRoom
       if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
 
       const finalData = [];
