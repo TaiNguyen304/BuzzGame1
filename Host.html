@@ -96,6 +96,12 @@
       color: black;
     }
 
+    /* THÊM: Style cho nút "Xuất kết quả" */
+    #btnExportResults {
+      background: green;
+      color: white;
+    }
+
 
     #unlockAnswersLimited,
     #unlockBuzzLimited {
@@ -299,6 +305,7 @@
     <button id="btnCreate">Tạo phòng</button>
     <button id="btnJoinManager">Tham gia phòng (Quản lý)</button>
     <button id="btnListUsers">Danh sách tham gia</button>
+    <button id="btnExportResults">Xuất kết quả</button>
   </div>
   <br><br>
 
@@ -375,6 +382,7 @@
 
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
 
   <script>
     const SOCKET_SERVER_URL = "https://buzzgame1-1.onrender.com";
@@ -454,26 +462,78 @@
 
       // Answer Time
       if (!lockedAnswer && answerDuration_host === 0 && answerStartTime > 0) {
-        
+        aDisp.innerHTML = `Thời gian đáp án đã trôi qua: <span style="color:green;">${format(now - answerStartTime)}</span> (Vĩnh viễn)`;
       } else if (!lockedAnswer && answerDuration_host > 0 && answerStartTime > 0) {
         // - 5000 là khoảng buffer 5 giây được trừ ở server
         const remain = answerStartTime + answerDuration_host * 1000 - now - 5000;
-        aDisp.innerHTML = `Thời gian gửi đáp án còn lại: <span style="color:red;">${format(remain)}</span>`;
+        aDisp.innerHTML = `Thời gian đáp án còn lại: <span style="color:red;">${format(remain)}</span>`;
       } else {
         aDisp.innerHTML = "";
       }
 
       // Buzz Time
       if (!lockedBuzz && buzzDuration_host === 0 && buzzStartTime > 0) {
-        
+        bDisp.innerHTML = `Thời gian chuông đã trôi qua: <span style="color:green;">${format(now - buzzStartTime)}</span> (Vĩnh viễn)`;
       } else if (!lockedBuzz && buzzDuration_host > 0 && buzzStartTime > 0) {
         // - 5000 là khoảng buffer 5 giây được trừ ở server
         const remain = buzzStartTime + buzzDuration_host * 1000 - now - 5000;
-        bDisp.innerHTML = `Thời gian bấm chuông còn lại: <span style="color:red;">${format(remain)}</span>`;
+        bDisp.innerHTML = `Thời gian chuông còn lại: <span style="color:red;">${format(remain)}</span>`;
       } else {
         bDisp.innerHTML = "";
       }
     }
+
+    // ========== XUẤT KẾT QUẢ (EXPORT) ==========
+    function exportResults() {
+      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
+      if (answers.length === 0 && buzzOrder.length === 0) {
+        return showPopup("Không có dữ liệu đáp án hoặc chuông để xuất!", "error");
+      }
+
+      // 1. Chuẩn bị dữ liệu cho Sheet 1: Đáp án
+      const ws1_data = [];
+      // Hàng tiêu đề (ô đỏ, chữ đậm trắng - Styling chỉ thực hiện được một phần)
+      ws1_data.push(["Tên người chơi", "Đáp án", "Thời gian"]);
+
+      // Thêm dữ liệu từ answers
+      answers.sort((a, b) => a.ts - b.ts).forEach(x => {
+        const timeElapsed = formatTime(x.ts, answerStartTime);
+        ws1_data.push([x.name, x.answer, timeElapsed]);
+      });
+
+      // 2. Chuẩn bị dữ liệu cho Sheet 2: Bấm chuông
+      const ws2_data = [];
+      // Hàng tiêu đề
+      ws2_data.push(["Tên người chơi", "Thời gian bấm chuông"]);
+
+      // Thêm dữ liệu từ buzzOrder
+      buzzOrder.sort((a, b) => a.ts - b.ts).forEach(x => {
+        const timeElapsed = formatTime(x.ts, buzzStartTime);
+        ws2_data.push([x.name, timeElapsed]);
+      });
+
+      // Tên file
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, ''); // VD: 20251118
+      const filename = `KetQua_Phong_${currentRoom}_${dateStr}.xlsx`;
+
+      // Tạo workbook và sheets
+      const workbook = XLSX.utils.book_new();
+
+      // Tạo Sheet 1
+      const ws1 = XLSX.utils.aoa_to_sheet(ws1_data);
+      XLSX.utils.book_append_sheet(workbook, ws1, "KetQua_DapAn");
+
+      // Tạo Sheet 2
+      const ws2 = XLSX.utils.aoa_to_sheet(ws2_data);
+      XLSX.utils.book_append_sheet(workbook, ws2, "KetQua_Buzz");
+
+      // Tải xuống file
+      XLSX.writeFile(workbook, filename);
+      showPopup("Đã xuất kết quả thành công!");
+    }
+    
+    // Gán sự kiện cho nút Xuất kết quả
+    document.getElementById("btnExportResults").onclick = exportResults;
 
 
     // ========== Tạo phòng ==========
@@ -515,8 +575,7 @@
     });
 
     // ========== Điều khiển Đáp án ==========
-    // Logic của nút điều khiển không thay đổi, vì Quản lý có thể bấm được do server cho phép
-
+    // ... (Giữ nguyên logic điều khiển)
     document.getElementById("unlockAnswersLimited").onclick = () => {
       if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
       const duration = Math.max(1, parseInt(answerDuration.value) || 0);
@@ -627,7 +686,7 @@
       myRole = "Manager";
       myName = name;
       document.getElementById("roomInfo").innerHTML =
-        `🔑 <b>Mã phòng:</b> <span style="font-size:1.5em">${roomCode}</span> | <b>Vai trò:</b> <span class="role-manager">QUẢN LÝ (${name})</span>`;
+        `🔑 <b>Mã phòng:</b> <span style="font-size:1.5em">${roomCode}</span> | <b>Vai trò:</b> <span class="role-manager">QUẢN LÝ</span>`;
       answers = [];
       buzzOrder = [];
       renderAnswers();
@@ -674,7 +733,6 @@
       managers.forEach(m => {
         const li = document.createElement("li");
         const isSelf = m.id === socket.id;
-        // Đã sửa: Loại bỏ ** và thay bằng <b>
         li.innerHTML = `${isSelf ? `(Bạn) ` : ''}<b>${m.name}</b> <span class="role-manager">(Quản lý)</span>`;
         ul.appendChild(li);
       });
