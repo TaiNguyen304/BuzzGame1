@@ -52,38 +52,59 @@
             border: 1px solid #ccc;
             border-radius: 4px;
             margin-right: 10px;
+            font-weight: bold;
         }
         
-        /* ================================================= */
-        /* Cập nhật style nút bấm theo yêu cầu (Đậm, Trắng, Hover Cam) */
-        #fetchButton, #autoRefreshButton {
+        /* Cập nhật style nút bấm (Đậm) */
+        #fetchButton, #autoRefreshButton, #joinButton {
             padding: 8px 15px;
             font-size: 16px;
             font-weight: bold; /* Chữ đậm */
-            color: white; /* Chữ trắng */
             cursor: pointer;
             border: none;
             border-radius: 4px;
-            transition: background-color 0.2s; 
+            transition: background-color 0.2s, color 0.2s; 
+            margin-right: 5px; /* Thêm khoảng cách giữa các nút */
         }
 
         /* Màu nền cơ bản */
         #fetchButton {
             background-color: blue; 
+            color: white; /* Chữ trắng */
         }
+        
         #autoRefreshButton {
             background-color: red; 
+            color: white; /* Chữ trắng */
         }
-
+        
+        /* Style cho nút Tham gia Phòng (Màu Vàng, Chữ Đen) */
+        #joinButton {
+            background-color: yellow;
+            color: black; /* Chữ đậm đen */
+        }
+        
         /* Màu nền khi Tự động Cập nhật ĐANG BẬT */
         #autoRefreshButton.active {
             background-color: green;
         }
 
-        /* HIỆU ỨNG HOVER */
-        #fetchButton:hover, 
-        #autoRefreshButton:hover {
+        /* HIỆU ỨNG HOVER (Áp dụng cho tất cả nút) */
+        #fetchButton:hover:not(:disabled), 
+        #autoRefreshButton:hover:not(:disabled),
+        #joinButton:hover:not(:disabled) {
             background-color: orange; /* Màu cam khi hover */
+            color: white; /* Chuyển sang chữ trắng khi hover */
+        }
+
+        /* Đảm bảo chữ đen ở nút Tham gia chuyển sang trắng khi hover */
+        #joinButton:hover:not(:disabled) {
+             color: white;
+        }
+
+        #fetchButton:disabled, #autoRefreshButton:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
         
         /* Message Box styling */
@@ -107,10 +128,9 @@
 
     <div id="inputContainer">
         <input type="text" id="roomCodeInput" placeholder="Nhập Mã Phòng" value="">
+        <button id="joinButton">Tham gia phòng</button>
         <button id="fetchButton">Tải Kết Quả</button>
         <button id="autoRefreshButton" data-status="off">Tự động Cập nhật: TẮT</button>
-        <div style="margin-top: 10px; font-size: 14px; font-weight: bold; color: red;">
-        </div>
     </div>
     
     <table id="resultsTable">
@@ -120,19 +140,20 @@
 
     <script>
         const SERVER_URL = "https://buzzgame1-1.onrender.com"; 
-        // =====================================================================
         
         const resultsTable = document.getElementById('resultsTable');
         const roomCodeInput = document.getElementById('roomCodeInput');
         const fetchButton = document.getElementById('fetchButton');
         const autoRefreshButton = document.getElementById('autoRefreshButton');
+        const joinButton = document.getElementById('joinButton');
         const messageBox = document.getElementById('messageBox');
         
         let refreshInterval = null;
 
         function showMessage(text, isError = false) {
             messageBox.textContent = text;
-            messageBox.style.borderColor = isError ? '#dc3545' : '#28a745';
+            // Thay đổi màu viền dựa trên trạng thái lỗi
+            messageBox.style.backgroundColor = isError ? 'red' : 'green'; 
             messageBox.style.display = 'block';
             setTimeout(() => {
                 messageBox.style.display = 'none';
@@ -142,7 +163,7 @@
         async function fetchAndDisplayResults() {
             const roomCode = roomCodeInput.value.trim();
             if (!roomCode) {
-                showMessage("Vui lòng nhập Room Code.", true);
+                showMessage("Vui lòng nhập Mã Phòng.", true);
                 return;
             }
 
@@ -159,7 +180,7 @@
 
                 if (!response.ok) {
                     const data = await response.json();
-                    showMessage(data.error || `Lỗi HTTP ${response.status}.`, true);
+                    showMessage(data.error || `Lỗi HTTP ${response.status}. Kiểm tra Server NodeJS và Mã Phòng.`, true);
                     return;
                 }
                 
@@ -188,7 +209,7 @@
                 });
 
                 if (autoRefreshButton.getAttribute('data-status') === 'off') {
-                    showMessage(`Đã tải ${data.length} kết quả thành công.`);
+                    showMessage(`Đã tải ${data.length} kết quả thành công.`, false);
                 }
 
             } catch (error) {
@@ -201,13 +222,12 @@
         
         function toggleAutoRefresh() {
             if (autoRefreshButton.getAttribute('data-status') === 'off') {
-                // Bật tự động cập nhật (3 giây/lần)
                 fetchAndDisplayResults(); 
-                refreshInterval = setInterval(fetchAndDisplayResults, 1);
+                refreshInterval = setInterval(fetchAndDisplayResults, 1000); 
                 autoRefreshButton.setAttribute('data-status', 'on');
                 autoRefreshButton.textContent = 'Tự động Cập nhật: BẬT';
                 autoRefreshButton.classList.add('active');
-                showMessage("Đã bật tự động cập nhật.");
+                showMessage("Đã bật tự động cập nhật (1s).", false);
             } else {
                 // Tắt tự động cập nhật
                 clearInterval(refreshInterval);
@@ -215,12 +235,18 @@
                 autoRefreshButton.setAttribute('data-status', 'off');
                 autoRefreshButton.textContent = 'Tự động Cập nhật: TẮT';
                 autoRefreshButton.classList.remove('active');
-                showMessage("Đã tắt tự động cập nhật.");
+                showMessage("Đã tắt tự động cập nhật.", false);
             }
         }
-
+        
+        // Gán sự kiện cho các nút
         fetchButton.addEventListener('click', fetchAndDisplayResults);
         autoRefreshButton.addEventListener('click', toggleAutoRefresh);
+        
+        // Xử lý sự kiện cho nút Tham gia phòng (chỉ hiển thị thông báo)
+        joinButton.addEventListener('click', () => {
+             showMessage(`Trang này chỉ dùng để hiển thị kết quả.`, false);
+        });
 
         window.onload = () => {
              if (roomCodeInput.value.trim()) {
