@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kết Quả</title>
+    <style>
+        /* Thiết lập nền trắng và font chữ cơ bản */
+        body {
+            background-color: white; /* Nền trắng */
+            font-family: Arial, sans-serif;
+            color: black;
+            margin: 0;
+            padding: 20px;
+            overflow: auto;
+        }
+
+        /* Bảng hiển thị kết quả - Tối giản, không viền, KHÔNG TIÊU ĐỀ */
+        #resultsTable {
+            width: 100%;
+            border-collapse: collapse; 
+        }
+
+        /* Các ô dữ liệu */
+        #resultsTable td {
+            font-weight: bold; /* Chữ đậm đen */
+            font-size: 1.2em;
+            padding: 8px 15px; 
+            border: none; 
+            text-align: left;
+            vertical-align: top;
+        }
+        
+        /* Phân bổ độ rộng cột */
+        #resultsTable tr td:nth-child(1) { width: 30%; } /* Cột Tên thí sinh */
+        #resultsTable tr td:nth-child(2) { width: 45%; } /* Cột Đáp án */
+        #resultsTable tr td:nth-child(3) { width: 25%; } /* Cột Thời gian */
+
+        /* Giao diện nhập liệu và điều khiển */
+        #inputContainer {
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        #roomCodeInput {
+            padding: 8px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        
+        /* ================================================= */
+        /* Cập nhật style nút bấm theo yêu cầu (Đậm, Trắng, Hover Cam) */
+        #fetchButton, #autoRefreshButton {
+            padding: 8px 15px;
+            font-size: 16px;
+            font-weight: bold; /* Chữ đậm */
+            color: white; /* Chữ trắng */
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            transition: background-color 0.2s; 
+        }
+
+        /* Màu nền cơ bản */
+        #fetchButton {
+            background-color: blue; 
+        }
+        #autoRefreshButton {
+            background-color: red; 
+        }
+
+        /* Màu nền khi Tự động Cập nhật ĐANG BẬT */
+        #autoRefreshButton.active {
+            background-color: green;
+        }
+
+        /* HIỆU ỨNG HOVER */
+        #fetchButton:hover, 
+        #autoRefreshButton:hover {
+            background-color: orange; /* Màu cam khi hover */
+        }
+        
+        /* Message Box styling */
+        #messageBox {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #ff00cc;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: none;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="inputContainer">
+        <input type="text" id="roomCodeInput" placeholder="Nhập Mã Phòng" value="">
+        <button id="fetchButton">Tải Kết Quả</button>
+        <button id="autoRefreshButton" data-status="off">Tự động Cập nhật: TẮT</button>
+        <div style="margin-top: 10px; font-size: 14px; font-weight: bold; color: red;">
+        </div>
+    </div>
+    
+    <table id="resultsTable">
+        </table>
+
+    <div id="messageBox"></div>
+
+    <script>
+        const SERVER_URL = "https://buzzgame1-1.onrender.com"; 
+        // =====================================================================
+        
+        const resultsTable = document.getElementById('resultsTable');
+        const roomCodeInput = document.getElementById('roomCodeInput');
+        const fetchButton = document.getElementById('fetchButton');
+        const autoRefreshButton = document.getElementById('autoRefreshButton');
+        const messageBox = document.getElementById('messageBox');
+        
+        let refreshInterval = null;
+
+        function showMessage(text, isError = false) {
+            messageBox.textContent = text;
+            messageBox.style.borderColor = isError ? '#dc3545' : '#28a745';
+            messageBox.style.display = 'block';
+            setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 3000);
+        }
+
+        async function fetchAndDisplayResults() {
+            const roomCode = roomCodeInput.value.trim();
+            if (!roomCode) {
+                showMessage("Vui lòng nhập Room Code.", true);
+                return;
+            }
+
+            try {
+                fetchButton.disabled = true;
+
+                const response = await fetch(`${SERVER_URL}/results`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ roomCode: roomCode })
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    showMessage(data.error || `Lỗi HTTP ${response.status}.`, true);
+                    return;
+                }
+                
+                const data = await response.json();
+
+                // Xóa nội dung cũ
+                resultsTable.innerHTML = ''; 
+
+                if (data.length === 0) {
+                    resultsTable.innerHTML = '<tr><td colspan="3" style="text-align:center; font-style:italic; font-weight: normal; font-size: 1em;">Chưa có đáp án nào được gửi.</td></tr>';
+                    return;
+                }
+
+                // Hiển thị dữ liệu (3 cột: Tên, Đáp án, Thời gian)
+                data.forEach(item => {
+                    const row = resultsTable.insertRow();
+                    
+                    let cellName = row.insertCell();
+                    cellName.textContent = item.name;
+
+                    let cellAnswer = row.insertCell();
+                    cellAnswer.textContent = item.answer;
+                    
+                    let cellTime = row.insertCell();
+                    cellTime.textContent = `${item.time.toFixed(2)}s`;
+                });
+
+                if (autoRefreshButton.getAttribute('data-status') === 'off') {
+                    showMessage(`Đã tải ${data.length} kết quả thành công.`);
+                }
+
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                showMessage(`LỖI KẾT NỐI: Server NodeJS (${SERVER_URL}) không phản hồi.`, true);
+            } finally {
+                fetchButton.disabled = false;
+            }
+        }
+        
+        function toggleAutoRefresh() {
+            if (autoRefreshButton.getAttribute('data-status') === 'off') {
+                // Bật tự động cập nhật (3 giây/lần)
+                fetchAndDisplayResults(); 
+                refreshInterval = setInterval(fetchAndDisplayResults, 1);
+                autoRefreshButton.setAttribute('data-status', 'on');
+                autoRefreshButton.textContent = 'Tự động Cập nhật: BẬT';
+                autoRefreshButton.classList.add('active');
+                showMessage("Đã bật tự động cập nhật.");
+            } else {
+                // Tắt tự động cập nhật
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+                autoRefreshButton.setAttribute('data-status', 'off');
+                autoRefreshButton.textContent = 'Tự động Cập nhật: TẮT';
+                autoRefreshButton.classList.remove('active');
+                showMessage("Đã tắt tự động cập nhật.");
+            }
+        }
+
+        fetchButton.addEventListener('click', fetchAndDisplayResults);
+        autoRefreshButton.addEventListener('click', toggleAutoRefresh);
+
+        window.onload = () => {
+             if (roomCodeInput.value.trim()) {
+                 fetchAndDisplayResults();
+             }
+        };
+    </script>
+</body>
+</html>

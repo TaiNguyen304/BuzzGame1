@@ -4,14 +4,42 @@ const cors = require("cors");
 const app = express();
 const http = require("http").createServer(app);
 
-app.use(cors({ origin: "*" }));
+// Cấu hình Middleware
+app.use(express.json()); 
+app.use(cors({ origin: "*", credentials: true })); 
 
 const io = require("socket.io")(http, {
     cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
 let rooms = {};   
-// roomCode -> { hostId, users: [{id, name, roomCode, role}], managers: [{id, name}], answers:[], buzz:[], statusAnswer, statusBuzz, answerStartTime, buzzStartTime, timers, answerDuration, buzzDuration }
+// roomCode -> { hostId, users: [{id, name, roomCode, role}], managers: [{id, name}], answers:[], buzz:[], statusAnswer, statusBuzz, answerStartTime, buzzStartTime, answerDuration, buzzDuration, answerTimer, buzzTimer }
+
+// ========================= HTTP Endpoint cho Result.html =========================
+// Endpoint này cho phép Result.html lấy dữ liệu đáp án
+app.post("/results", (req, res) => {
+    const { roomCode } = req.body;
+    
+    if (!roomCode || !rooms[roomCode]) {
+        return res.status(404).json({ error: "Phòng không tồn tại. Vui lòng kiểm tra Room Code." });
+    }
+
+    const room = rooms[roomCode];
+    
+    // Tạo cấu trúc dữ liệu: Tên, Đáp án, Thời gian
+    const results = room.answers.map(ans => ({
+        name: ans.name, // Tên thí sinh
+        answer: ans.answer, // Đáp án
+        // Tính thời gian đáp án (tính bằng giây) so với thời điểm bắt đầu vòng trả lời
+        time: (ans.time - room.answerStartTime) / 1000 
+    }));
+
+    // Sắp xếp theo thời gian (từ nhanh nhất đến chậm nhất)
+    results.sort((a, b) => a.time - b.time);
+
+    res.json(results);
+});
+// =================================================================================
 
 io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
@@ -35,276 +63,161 @@ io.on("connection", (socket) => {
                 buzzTimer: null
             };
         } else {
-             // Trường hợp Host cũ ngắt kết nối, Host mới sẽ được gán lại
              rooms[roomCode].hostId = socket.id;
         }
+        
         socket.join(roomCode);
-        
-        // SỬA LỖI: Gửi lại dữ liệu đáp án và chuông hiện tại của phòng
-        socket.emit("room-created", { 
-            roomCode: roomCode, 
-            answers: rooms[roomCode].answers, 
-            buzzOrder: rooms[roomCode].buzz 
-        }); 
-        
-        console.log("Room created or re-hosted:", roomCode);
+        console.log(`Host ${socket.id} created/reconnected to room ${roomCode}`);
+        socket.emit("host-room-info", { roomCode, role: "Host" });
     });
 
-    // ========================= USER JOIN =========================
-    socket.on("user-join-room", ({ roomCode, name }) => {
+    // ========================= THAM GIA PHÒNG =========================
+    socket.on("join-room", ({ roomCode, name, role }) => {
         const room = rooms[roomCode];
-        if (!room) return socket.emit("join-error", "Mã phòng không tồn tại.");
-
-        // Kiểm tra trùng tên (chỉ trong danh sách thí sinh)
-        if (room.users.some(u => u.name === name)) {
-            return socket.emit("join-error", `Tên "${name}" đã được sử dụng.`);
+        if (!room) {
+            return socket.emit("join-error", "Phòng không tồn tại.");
         }
 
-        // Thêm vào danh sách users
-        room.users.push({ id: socket.id, name, roomCode: roomCode, role: 'Contestant' });
-        socket.join(roomCode);
-
-        // Gửi trạng thái hiện tại của phòng cho thí sinh
-        socket.emit("join-success", { 
-            roomCode: roomCode, 
-            name: name,
-            statusAnswer: room.statusAnswer, 
-            durationAnswer: room.answerDuration,
-            startTimeAnswer: room.answerStartTime,
-            statusBuzz: room.statusBuzz,
-            durationBuzz: room.buzzDuration,
-            startTimeBuzz: room.buzzStartTime,
-        });
+        const newUser = { id: socket.id, name, roomCode, role };
         
-        // Thông báo cho Host/Manager
-        const hostId = room.hostId;
-        if (hostId) {
-             io.to(hostId).emit("host-new-user", { id: socket.id, name, role: 'Contestant' });
-        }
-        room.managers.forEach(m => io.to(m.id).emit("host-new-user", { id: socket.id, name, role: 'Contestant' }));
-        console.log(`User ${name} joined room ${roomCode}`);
-    });
-
-    // ========================= MANAGER JOIN =========================
-    socket.on("manager-join-room", ({ roomCode, name }) => {
-        const room = rooms[roomCode];
-        if (!room) return socket.emit("join-error", "Mã phòng không tồn tại.");
-
-        // Kiểm tra trùng tên (chỉ trong danh sách quản lý)
-        if (room.managers.some(m => m.name === name)) {
-            return socket.emit("join-error", `Tên "${name}" (Quản lý) đã được sử dụng.`);
+        if (role === "Manager") {
+            room.managers.push(newUser);
+        } else if (role === "Contestant") {
+            room.users.push(newUser);
+            if (room.hostId) io.to(room.hostId).emit("host-new-user", newUser);
+            room.managers.forEach(m => io.to(m.id).emit("host-new-user", newUser));
         }
 
-        // Thêm vào danh sách managers
-        room.managers.push({ id: socket.id, name });
         socket.join(roomCode);
-
-        // SỬA LỖI: Gửi lại dữ liệu đáp án và chuông hiện tại của phòng
-        socket.emit("manager-join-success", { 
-            roomCode: roomCode, 
-            name: name,
-            answers: room.answers, 
-            buzzOrder: room.buzz 
-        });
-
-        // Thông báo cho Host/Manager khác
-        const hostId = room.hostId;
-        if (hostId) {
-             io.to(hostId).emit("host-new-user", { id: socket.id, name, role: 'Manager' });
-        }
-        room.managers.filter(m => m.id !== socket.id).forEach(m => io.to(m.id).emit("host-new-user", { id: socket.id, name, role: 'Manager' }));
-        console.log(`Manager ${name} joined room ${roomCode}`);
+        socket.emit("join-success", { roomCode, role, statusAnswer: room.statusAnswer, statusBuzz: room.statusBuzz });
+        console.log(`${role} ${name} joined room ${roomCode}`);
     });
 
-    // ========================= LẤY DANH SÁCH USER (cho Host/Manager) =========================
-    socket.on("host-get-users", (roomCode) => {
+    // ========================= BÀI LÀM (Contestant) =========================
+    socket.on("submit-answer", ({ roomCode, answer }) => {
+        const room = rooms[roomCode];
+        if (!room || room.statusAnswer === "locked") return socket.emit("answer-error", "Thời gian trả lời đã kết thúc.");
+
+        const user = room.users.find(u => u.id === socket.id);
+        if (!user) return socket.emit("answer-error", "Không tìm thấy thông tin người dùng.");
+        
+        // LOGIC: Contestant có thể gửi nhiều đáp án, chỉ ghi nhận đáp án cuối cùng
+        const existingAnswerIndex = room.answers.findIndex(ans => ans.id === socket.id);
+        if (existingAnswerIndex !== -1) {
+            // Cập nhật đáp án và thời gian hiện tại (ghi nhận đáp án cuối)
+            room.answers[existingAnswerIndex].answer = answer;
+            room.answers[existingAnswerIndex].time = Date.now(); 
+        } else {
+            // Thêm đáp án mới
+            room.answers.push({ id: user.id, name: user.name, answer, time: Date.now() });
+        }
+        
+        socket.emit("answer-success", "Đã gửi/cập nhật đáp án thành công.");
+        
+        if (room.hostId) io.to(room.hostId).emit("host-new-answer", room.answers);
+        room.managers.forEach(m => io.to(m.id).emit("host-new-answer", room.answers));
+    });
+
+    // ========================= BUZZER (Contestant) =========================
+    socket.on("submit-buzz", ({ roomCode }) => {
+        const room = rooms[roomCode];
+        if (!room || room.statusBuzz === "locked") return socket.emit("buzz-error", "Buzzer đã bị khóa.");
+
+        const user = room.users.find(u => u.id === socket.id);
+        if (!user) return socket.emit("buzz-error", "Không tìm thấy thông tin người dùng.");
+
+        // LOGIC: Contestant chỉ được bấm buzz 1 lần
+        const existingBuzzIndex = room.buzz.findIndex(b => b.id === socket.id);
+        if (existingBuzzIndex !== -1) return socket.emit("buzz-error", "Bạn đã bấm buzzer rồi.");
+        
+        // Thêm buzz
+        room.buzz.push({ id: user.id, name: user.name, time: Date.now() });
+        
+        socket.emit("buzz-success", "Đã bấm buzzer thành công.");
+        
+        if (room.hostId) io.to(room.hostId).emit("host-new-buzz", room.buzz);
+        room.managers.forEach(m => io.to(m.id).emit("host-new-buzz", room.buzz));
+    });
+
+    // ========================= CÁC LỆNH CỦA HOST/MANAGER =========================
+    socket.on("host-start-answer", ({ roomCode, duration }) => {
         const room = rooms[roomCode];
         if (!room) return;
 
-        // Tìm Host hiện tại
-        const host = room.hostId ? { id: room.hostId, name: "Host" } : null;
+        room.answers = [];
+        room.statusAnswer = "open";
+        room.answerStartTime = Date.now();
         
-        // Gửi danh sách cho người yêu cầu
-        socket.emit("host-all-users", {
-            host: host,
-            managers: room.managers,
-            contestants: room.users
-        });
+        if (room.answerTimer) clearTimeout(room.answerTimer);
+
+        room.answerTimer = setTimeout(() => {
+            room.statusAnswer = "locked";
+            room.answerTimer = null;
+            io.to(roomCode).emit("answer-status-changed", "locked");
+        }, duration * 1000); 
+
+        io.to(roomCode).emit("answer-status-changed", "open", Date.now(), duration);
+        io.to(roomCode).emit("host-new-answer", room.answers); 
     });
-
-    // ========================= ĐIỀU KHIỂN ĐÁP ÁN =========================
-    socket.on("host-toggle-answer", ({ roomCode, state, duration }) => {
+    
+    socket.on("host-lock-answer", (roomCode) => {
         const room = rooms[roomCode];
-        if (!room || (room.hostId !== socket.id && !room.managers.some(m => m.id === socket.id))) return; // Chỉ Host/Manager mới được điều khiển
-
-        // Xóa timer cũ nếu có
+        if (!room) return;
+        
         if (room.answerTimer) {
             clearTimeout(room.answerTimer);
             room.answerTimer = null;
         }
 
-        if (state === "open") {
-            room.statusAnswer = "open";
-            room.answerDuration = duration || 0; // 0 là vĩnh viễn
-            room.answerStartTime = Date.now();
-            
-            io.to(roomCode).emit("answer-status-changed", { 
-                state: "open", 
-                duration: room.answerDuration,
-                startTime: room.answerStartTime // Gửi thời gian gốc từ server
-            });
-
-            if (duration > 0) {
-                // Thiết lập timer tự động khóa
-                room.answerTimer = setTimeout(() => {
-                    room.statusAnswer = "locked";
-                    room.answerTimer = null;
-                    // Broadcast trạng thái khóa
-                    io.to(roomCode).emit("answer-status-changed", { state: "locked" });
-                }, duration * 1000);
-            }
-        } else { // state === "locked"
-            room.statusAnswer = "locked";
-            room.answerTimer = null;
-            io.to(roomCode).emit("answer-status-changed", { state: "locked" });
-        }
+        room.statusAnswer = "locked";
+        io.to(roomCode).emit("answer-status-changed", "locked");
     });
-
-    // ========================= RESET ĐÁP ÁN (NEW) =========================
-    socket.on("host-reset-answers", (roomCode) => {
+    
+    socket.on("host-show-answers", (roomCode) => {
         const room = rooms[roomCode];
-        // Chỉ Host/Manager mới được reset
-        if (!room || (room.hostId !== socket.id && !room.managers.some(m => m.id === socket.id))) return; 
-
-        room.answers = []; // Xóa dữ liệu đáp án
-        
-        // Broadcast sự kiện reset đến tất cả Host/Manager trong phòng để đồng bộ
-        // Broadcast sự kiện reset đến tất cả các clients (bao gồm cả Contestants, mặc dù họ không cần render)
-        io.to(roomCode).emit("answers-reset");
-        console.log(`Answers reset by ${socket.id} in room ${roomCode}`);
-    });
-
-
-    // ========================= ĐIỀU KHIỂN CHUÔNG =========================
-    socket.on("host-toggle-buzz", ({ roomCode, state, duration }) => {
-        const room = rooms[roomCode];
-        if (!room || (room.hostId !== socket.id && !room.managers.some(m => m.id === socket.id))) return; // Chỉ Host/Manager mới được điều khiển
-
-        // Xóa timer cũ nếu có
-        if (room.buzzTimer) {
-            clearTimeout(room.buzzTimer);
-            room.buzzTimer = null;
-        }
-
-        if (state === "open") {
-            room.statusBuzz = "open";
-            room.buzzDuration = duration || 0;
-            room.buzzStartTime = Date.now();
-
-            io.to(roomCode).emit("buzz-status-changed", { 
-                state: "open", 
-                duration: room.buzzDuration,
-                startTime: room.buzzStartTime // Gửi thời gian gốc từ server
-            });
-
-            if (duration > 0) {
-                // Thiết lập timer tự động khóa
-                room.buzzTimer = setTimeout(() => {
-                    room.statusBuzz = "locked";
-                    room.buzzTimer = null;
-                    // Broadcast trạng thái khóa
-                    io.to(roomCode).emit("buzz-status-changed", { state: "locked" });
-                }, duration * 1000);
-            }
-
-        } else { // state === "locked"
-            room.statusBuzz = "locked";
-            room.buzzTimer = null;
-            io.to(roomCode).emit("buzz-status-changed", { state: "locked" });
-        }
-    });
-
-    // ========================= RESET CHUÔNG (NEW) =========================
-    socket.on("host-reset-buzz", (roomCode) => {
-        const room = rooms[roomCode];
-        // Chỉ Host/Manager mới được reset
-        if (!room || (room.hostId !== socket.id && !room.managers.some(m => m.id === socket.id))) return;
-
-        room.buzz = []; // Xóa dữ liệu chuông
-        
-        // Broadcast sự kiện reset đến tất cả Host/Manager trong phòng để đồng bộ
-        io.to(roomCode).emit("buzz-reset");
-        console.log(`Buzz reset by ${socket.id} in room ${roomCode}`);
-    });
-
-
-    // ========================= USER GỬI ĐÁP ÁN =========================
-    socket.on("user-send-answer", ({ roomCode, name, answer }) => {
-        const room = rooms[roomCode];
-        // Cho phép gửi đáp án sau khi khóa, nhưng chỉ cập nhật nếu vẫn trong thời gian mở
-        // Nếu muốn chỉ gửi được khi "open" thì thêm: if (room.statusAnswer !== "open") return;
         if (!room) return;
-        
-        const ts = Date.now();
-        const record = { name, answer, ts };
 
-        // Cập nhật/Thêm đáp án mới nhất
-        const index = room.answers.findIndex(x => x.name === name);
-        if (index >= 0) room.answers[index] = record;
-        else room.answers.push(record);
-
-        // Gửi đáp án mới nhất đến Host/Manager
-        const hostId = room.hostId;
-        if (hostId) {
-             io.to(hostId).emit("host-new-answer", record);
-        }
-        room.managers.forEach(m => io.to(m.id).emit("host-new-answer", record));
+        const sortedAnswers = [...room.answers].sort((a, b) => a.time - b.time);
+        io.to(roomCode).emit("answers-revealed", sortedAnswers);
     });
 
-    // ========================= USER BẤM CHUÔNG =========================
-    socket.on("user-buzz", ({ roomCode, name }) => {
+    socket.on("host-clear-answers", (roomCode) => {
         const room = rooms[roomCode];
-        if (!room || room.statusBuzz !== "open") return; // Chỉ cho bấm khi đang mở
+        if (!room) return;
 
-        // Kiểm tra xem đã bấm chuông chưa
-        if (room.buzz.some(b => b.name === name)) return;
-
-        const ts = Date.now();
-        const record = { name, ts };
-        room.buzz.push(record);
-
-        // Gửi thông tin bấm chuông mới nhất đến Host/Manager
-        const hostId = room.hostId;
-        if (hostId) {
-             io.to(hostId).emit("host-new-buzz", record);
-        }
-        room.managers.forEach(m => io.to(m.id).emit("host-new-buzz", record));
+        room.answers = [];
+        if (room.hostId) io.to(room.hostId).emit("host-new-answer", room.answers);
+        room.managers.forEach(m => io.to(m.id).emit("host-new-answer", room.answers));
     });
 
+    socket.on("host-get-users", (roomCode) => {
+        const room = rooms[roomCode];
+        if (!room) return;
 
-    // ========================= DISCONNECT =========================
+        const host = room.hostId ? room.managers.find(m => m.id === room.hostId) || { id: room.hostId, name: "Host (ID: " + room.hostId.substring(0, 4) + "...) " } : null;
+
+        socket.emit("host-all-users", {
+            host: host,
+            managers: room.managers.filter(m => m.id !== room.hostId),
+            contestants: room.users
+        });
+    });
+
+    // ========================= KHI NGẮT KẾT NỐI =========================
     socket.on("disconnect", () => {
-        console.log("Disconnected:", socket.id);
-        
+        console.log("User disconnected:", socket.id);
+
         for (const roomCode in rooms) {
             const room = rooms[roomCode];
-            
-            // 1. Kiểm tra nếu là Host
+
             if (room.hostId === socket.id) {
-                console.log(`Host ${socket.id} left room ${roomCode}`);
-                // Không xóa phòng, chỉ xóa hostId để Host mới có thể re-host
                 room.hostId = null; 
+                continue;
             }
 
-            // 2. Xóa người dùng (Contestant)
-            const initialUserCount = room.users.length;
             const leftUserIndex = room.users.findIndex(user => user.id === socket.id);
-
             if (leftUserIndex !== -1) {
-                const leftUser = room.users[leftUserIndex];
                 room.users.splice(leftUserIndex, 1);
-                console.log(`Contestant ${leftUser.name} left room ${roomCode}`);
-                // Thông báo cho Host/Manager
                 if (room.hostId) {
                     io.to(room.hostId).emit("host-user-left", { id: socket.id, role: 'Contestant' });
                 }
@@ -312,12 +225,9 @@ io.on("connection", (socket) => {
                 break; 
             }
 
-            // 3. Xóa Quản lý (Manager)
             const leftManagerIndex = room.managers.findIndex(manager => manager.id === socket.id);
             if (leftManagerIndex !== -1) {
                 room.managers.splice(leftManagerIndex, 1);
-                console.log(`Manager ${socket.id} left room ${roomCode}`);
-                // Thông báo cho Host/Manager
                 if (room.hostId) {
                     io.to(room.hostId).emit("host-user-left", { id: socket.id, role: 'Manager' });
                 }
@@ -328,7 +238,7 @@ io.on("connection", (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 http.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Server listening on *:${PORT}`);
 });
