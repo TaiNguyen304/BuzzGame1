@@ -20,11 +20,20 @@
             border-collapse: collapse; 
         }
 
+        /* Thêm header cho bảng kết quả */
+        #resultsTable th {
+            background-color: #f0f0f0;
+            font-size: 1.1em;
+            padding: 8px 15px;
+            border: 1px solid #aaa;
+            text-align: left;
+        }
+
         #resultsTable td {
             font-weight: bold; 
             font-size: 1.2em;
             padding: 8px 15px; 
-            border: none; 
+            border: 1px solid #aaa; /* Thêm border để dễ nhìn */
             text-align: left;
             vertical-align: top;
         }
@@ -51,7 +60,8 @@
             font-weight: bold;
         }
         
-        #fetchButton, #autoRefreshButton, #joinButton {
+        /* Thay thế các nút cũ */
+        #joinButton {
             padding: 8px 15px;
             font-size: 16px;
             font-weight: bold; 
@@ -60,34 +70,16 @@
             border-radius: 4px;
             transition: background-color 0.2s, color 0.2s; 
             margin-right: 5px; 
-        }
-
-        #fetchButton {
-            background-color: blue; 
+            background-color: green; 
             color: white; 
         }
         
-        #autoRefreshButton {
-            background-color: red; 
-            color: white; 
-        }
-        
-        #autoRefreshButton.active {
-            background-color: green;
-        }
-
-        #fetchButton:hover:not(:disabled), 
-        #autoRefreshButton:hover:not(:disabled),
         #joinButton:hover:not(:disabled) {
-            background-color: orange; 
-            color: white; 
+            background-color: orange;
+            color: white;
         }
 
-        #joinButton:hover:not(:disabled) {
-             color: white;
-        }
-
-        #fetchButton:disabled, #autoRefreshButton:disabled {
+        #joinButton:disabled {
             opacity: 0.6;
             cursor: not-allowed;
         }
@@ -112,28 +104,33 @@
 
     <div id="inputContainer">
         <input type="text" id="roomCodeInput" placeholder="Nhập Mã Phòng" value="">
-        <button id="fetchButton">Tải Kết Quả</button>
-        <button id="autoRefreshButton" data-status="off">Tự động Cập nhật: TẮT</button>
+        <button id="joinButton">Tham gia Phòng (Xem Kết Quả)</button>
+        <span id="roomStatus" style="margin-left: 20px; color: blue;">Chưa tham gia phòng</span>
     </div>
     
     <table id="resultsTable">
-        </table>
+        <thead>
+            
+        </thead>
+        <tbody>
+            
+        </tbody>
+    </table>
 
     <div id="messageBox"></div>
 
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
-        const SERVER_URL = "https://buzzgame1-1.onrender.com"; 
+        const SOCKET_SERVER_URL = "https://buzzgame1-1.onrender.com"; 
+        const socket = io(SOCKET_SERVER_URL, { autoConnect: true });
         
-        const resultsTable = document.getElementById('resultsTable');
+        const resultsTableBody = document.querySelector('#resultsTable tbody');
         const roomCodeInput = document.getElementById('roomCodeInput');
-        const fetchButton = document.getElementById('fetchButton');
-        const autoRefreshButton = document.getElementById('autoRefreshButton');
         const joinButton = document.getElementById('joinButton');
         const messageBox = document.getElementById('messageBox');
+        const roomStatus = document.getElementById('roomStatus');
         
-        let refreshInterval = null;
-        let lastErrorTime = 0;
-        const ERROR_COOLDOWN = 5000; // Thời gian tối thiểu giữa hai lần báo lỗi (5 giây)
+        let currentRoom = null; 
 
         function showMessage(text, isError = false) {
             messageBox.textContent = text;
@@ -144,108 +141,94 @@
             }, 3000);
         }
 
-        async function fetchAndDisplayResults(isManualFetch = false) {
-            const roomCode = roomCodeInput.value.trim();
-            if (!roomCode) {
-                if (isManualFetch) showMessage("Vui lòng nhập Mã Phòng.", true);
+        function renderResults(data) {
+            resultsTableBody.innerHTML = ''; 
+
+            if (data.length === 0) {
+                resultsTableBody.innerHTML = '<tr><td colspan="3" style="text-align:center; font-style:italic; font-weight: normal; font-size: 1em; border: none;">Chưa có đáp án nào được gửi.</td></tr>';
                 return;
             }
 
-            try {
-                if (isManualFetch) fetchButton.disabled = true;
-
-                const response = await fetch(`${SERVER_URL}/results`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ roomCode: roomCode })
-                });
-
-                if (!response.ok) {
-                    const data = await response.json();
-                    
-                    // Chỉ báo lỗi nếu là fetch thủ công HOẶC nếu đã qua thời gian cooldown
-                    if (isManualFetch || Date.now() - lastErrorTime > ERROR_COOLDOWN) {
-                        showMessage(data.error || `Lỗi HTTP ${response.status}. Kiểm tra Server NodeJS và Mã Phòng.`, true);
-                        lastErrorTime = Date.now();
-                    }
-                    return;
-                }
+            // Dữ liệu đã được sắp xếp từ server
+            data.forEach(item => {
+                const row = resultsTableBody.insertRow();
                 
-                const data = await response.json();
+                let cellName = row.insertCell();
+                cellName.textContent = item.name;
 
-                // Xóa nội dung cũ
-                resultsTable.innerHTML = ''; 
-
-                if (data.length === 0) {
-                    resultsTable.innerHTML = '<tr><td colspan="3" style="text-align:center; font-style:italic; font-weight: normal; font-size: 1em;">Chưa có đáp án nào được gửi.</td></tr>';
-                    // Chỉ hiển thị thông báo thành công khi fetch thủ công
-                    if (isManualFetch) showMessage(`Đã tải 0 kết quả thành công.`, false);
-                    return;
-                }
-
-                // Hiển thị dữ liệu (3 cột: Tên, Đáp án, Thời gian)
-                data.forEach(item => {
-                    const row = resultsTable.insertRow();
-                    
-                    let cellName = row.insertCell();
-                    cellName.textContent = item.name;
-
-                    let cellAnswer = row.insertCell();
-                    cellAnswer.textContent = item.answer;
-                    
-                    let cellTime = row.insertCell();
-                    cellTime.textContent = `${item.time.toFixed(2)}s`;
-                });
-
-                if (isManualFetch) showMessage(`Đã tải ${data.length} kết quả thành công.`, false);
-
-            } catch (error) {
-                console.error("Fetch Error:", error);
+                let cellAnswer = row.insertCell();
+                cellAnswer.textContent = item.answer;
                 
-                // Chỉ báo lỗi nếu là fetch thủ công HOẶC nếu đã qua thời gian cooldown
-                if (isManualFetch || Date.now() - lastErrorTime > ERROR_COOLDOWN) {
-                    showMessage(`LỖI KẾT NỐI: Server NodeJS (${SERVER_URL}) không phản hồi. Server có thể đang ngủ (cold start).`, true);
-                    lastErrorTime = Date.now();
-                }
-            } finally {
-                if (isManualFetch) fetchButton.disabled = false;
-            }
+                let cellTime = row.insertCell();
+                // Định dạng thời gian
+                const totalSeconds = Math.floor(item.time);
+                const milliseconds = Math.round((item.time % 1) * 1000); 
+                cellTime.textContent = `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
+            });
         }
         
-        function toggleAutoRefresh() {
-            if (autoRefreshButton.getAttribute('data-status') === 'off') {
-                fetchAndDisplayResults(false); 
-                refreshInterval = setInterval(() => fetchAndDisplayResults(false), 3000); 
-                autoRefreshButton.setAttribute('data-status', 'on');
-                autoRefreshButton.textContent = 'Tự động Cập nhật: BẬT';
-                autoRefreshButton.classList.add('active');
-                showMessage("Đã bật tự động cập nhật.", false);
-            } else {
-                // Tắt tự động cập nhật
-                clearInterval(refreshInterval);
-                refreshInterval = null;
-                autoRefreshButton.setAttribute('data-status', 'off');
-                autoRefreshButton.textContent = 'Tự động Cập nhật: TẮT';
-                autoRefreshButton.classList.remove('active');
-                showMessage("Đã tắt tự động cập nhật.", false);
-            }
-        }
+        // ========================= SOCKET.IO LOGIC =========================
+
+        socket.on("connect", () => {
+             console.log("Connected to server. ID:", socket.id);
+             if (currentRoom) {
+                 // Xử lý reconnect: Nếu đã có phòng thì join lại (dùng event mới)
+                 socket.emit("viewer-rejoin-room", currentRoom);
+             }
+        });
+
+        // Event thành công khi tham gia/rejoin phòng
+        socket.on("viewer-join-success", (data) => {
+            currentRoom = data.roomCode;
+            roomStatus.textContent = `Đang xem kết quả Phòng: ${currentRoom}`;
+            joinButton.disabled = true;
+            roomCodeInput.disabled = true;
+            renderResults(data.answers);
+            showMessage(`Tham gia phòng ${currentRoom} thành công. Tự động cập nhật đã BẬT.`, false);
+        });
+
+        // Lắng nghe lỗi khi tham gia
+        socket.on("join-error", (message) => {
+             joinButton.disabled = false;
+             roomCodeInput.disabled = false;
+             showMessage(message, true);
+        });
         
-        // Gán sự kiện cho nút Tải Kết Quả, truyền tham số true để xử lý lỗi như fetch thủ công
-        fetchButton.addEventListener('click', () => fetchAndDisplayResults(true));
-        autoRefreshButton.addEventListener('click', toggleAutoRefresh);
-        
-        // Xử lý sự kiện cho nút Tham gia phòng
+        // Lắng nghe cập nhật kết quả (từ server)
+        socket.on("update-results", (data) => {
+             renderResults(data);
+             console.log("Results updated from server.");
+        });
+
+        // Sự kiện khi đáp án bị reset (server sẽ gửi update-results rỗng, nhưng dùng event riêng thì rõ ràng hơn)
+        socket.on("answers-reset", () => {
+            // Tạm thời hiển thị tin nhắn reset, sau đó renderResults rỗng sẽ xóa bảng
+            showMessage("Đáp án đã được Host/Manager reset!", true); 
+        });
+
+        // Gán sự kiện cho nút Tham gia phòng (Xem Kết Quả)
         joinButton.addEventListener('click', () => {
-             showMessage(`Trang này chỉ dùng để hiển thị kết quả.`, false);
+            const roomCode = roomCodeInput.value.trim();
+            if (!roomCode) {
+                 showMessage("Vui lòng nhập Mã Phòng.", true);
+                 return;
+            }
+            if (roomCode.length !== 6 || isNaN(roomCode)) {
+                 showMessage("Mã phòng phải là 6 chữ số!", true);
+                 return;
+            }
+            
+            joinButton.disabled = true;
+            roomCodeInput.disabled = true;
+            
+            // Gửi event lên server để tham gia phòng xem kết quả
+            socket.emit("viewer-join-room", parseInt(roomCode));
         });
 
         window.onload = () => {
              if (roomCodeInput.value.trim()) {
-                 // Fetch lần đầu khi tải trang
-                 fetchAndDisplayResults(true);
+                 // Tự động tham gia nếu đã có mã phòng trong input
+                 joinButton.click();
              }
         };
     </script>
