@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kết Quả</title>
     <style>
-        /* CSS Cơ Bản */
+        /* ==================== GLOBAL STYLES ==================== */
         body {
             background-color: white; 
             font-family: Arial, sans-serif;
@@ -13,15 +13,23 @@
             margin: 0;
             padding: 20px;
             overflow: auto;
+            font-weight: bold; 
+        }
+        
+        /* Đảm bảo tất cả các tiêu đề và container con cũng là bold */
+        h2, h3, span, p {
+            font-weight: bold !important;
+            font-style: normal !important;
+            color: black !important;
         }
 
-        #inputContainer {
+        /* Container thay thế cho khu vực nhập liệu */
+        #headerContainer {
             margin-bottom: 20px;
             padding: 10px;
             background: #f0f0f0;
             border-radius: 5px;
             text-align: center;
-            font-weight: bold;
         }
         
         #resultsContainer {
@@ -29,41 +37,9 @@
             padding: 10px;
             background: #fff;
             box-shadow: 0 0 5px rgba(0,0,0,0.05);
+            min-height: 100px;
         }
 
-        #roomCodeInput {
-            padding: 8px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            margin-right: 10px;
-            font-weight: bold;
-        }
-        
-        /* Thay thế các nút cũ */
-        #joinButton {
-            padding: 8px 15px;
-            font-size: 16px;
-            font-weight: bold; 
-            cursor: pointer;
-            border: none;
-            border-radius: 4px;
-            transition: background-color 0.2s, color 0.2s; 
-            margin-right: 5px; 
-            background-color: green; 
-            color: white; 
-        }
-        
-        #joinButton:hover:not(:disabled) {
-            background-color: orange;
-            color: white;
-        }
-
-        #joinButton:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        
         #messageBox {
             position: fixed;
             top: 50%;
@@ -76,20 +52,24 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             z-index: 1000;
             display: none;
-            font-weight: bold;
+        }
+        
+        /* Đảm bảo chữ đen và đậm cho các dòng kết quả */
+        #resultsContainer p {
+            color: black !important;
+            font-weight: bold !important;
         }
     </style>
 </head>
 <body>
 
-    <div id="inputContainer">
-        <input type="text" id="roomCodeInput" placeholder="Nhập Mã Phòng" value="">
-        <button id="joinButton">Tham gia Phòng (Xem Kết Quả)</button>
-        <span id="roomStatus" style="margin-left: 20px; color: blue;">Chưa tham gia phòng</span>
+    <div id="headerContainer">
+        <h2 style="margin: 0;">Kết quả</h2>
+        <span id="roomStatus" style="color: blue;">Đang kết nối...</span>
     </div>
     
     <div id="resultsContainer">
-        <p style="text-align:center; font-style:italic; font-weight: bold; font-size: 1em; color: black;"></p>
+        <p style="text-align:center; font-weight: bold; font-size: 1em; color: black;">Đang chờ Mã phòng từ URL...</p>
     </div>
 
     <div id="messageBox"></div>
@@ -101,12 +81,11 @@
         const socket = io(SOCKET_SERVER_URL, { autoConnect: true });
         
         const resultsContainer = document.getElementById('resultsContainer');
-        const roomCodeInput = document.getElementById('roomCodeInput');
-        const joinButton = document.getElementById('joinButton');
         const messageBox = document.getElementById('messageBox');
         const roomStatus = document.getElementById('roomStatus');
         
         let currentRoom = null; 
+        let initialRoomCode = null; // Mã phòng đọc từ URL
 
         function showMessage(text, isError = false) {
             messageBox.textContent = text;
@@ -117,31 +96,40 @@
             }, 3000);
         }
 
-        // HÀM HIỂN THỊ KẾT QUẢ DƯỚI DẠNG CHUỖI TEXT
+        // Hàm đọc Mã phòng từ URL (?roomid=123456)
+        function getRoomCodeFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            const roomid = params.get('roomid');
+            // Đảm bảo mã phòng là 6 chữ số
+            if (roomid && roomid.length === 6 && !isNaN(roomid)) {
+                return parseInt(roomid);
+            }
+            return null;
+        }
+
         function renderResults(data) {
-            resultsContainer.innerHTML = ''; // Xóa kết quả cũ
+            resultsContainer.innerHTML = ''; 
 
             if (data.length === 0) {
-                resultsContainer.innerHTML = '<p style="text-align:center; font-style:italic; font-weight: bold; font-size: 1em; color: #555;">Chưa có đáp án nào được gửi.</p>';
+                // Đảm bảo chữ đậm và không nghiêng
+                resultsContainer.innerHTML = '<p style="text-align:center; font-size: 1em; color: black;">Chưa có đáp án nào được gửi.</p>';
                 return;
             }
 
-            // Dữ liệu đã được sắp xếp từ server
             data.forEach(item => {
                 const totalSeconds = Math.floor(item.time);
                 // Lấy 3 chữ số thập phân (milliseconds)
                 const milliseconds = Math.round((item.time % 1) * 1000); 
                 const formattedTime = `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
                 
-                // Tạo chuỗi Text theo định dạng yêu cầu: "Tên người chơi" | "Đáp án" | "Thời gian"
-                const resultText = `<b>${item.name}</b> | ${item.answer} | <i>${formattedTime}</i>`;
+                // Định dạng: Tên người chơi | Đáp án | Thời gian (Toàn bộ là chữ đậm)
+                const resultText = `${item.name} | ${item.answer} | ${formattedTime}`;
                 
-                // Tạo một dòng mới (thẻ p) để chứa kết quả
                 const p = document.createElement('p');
-                p.innerHTML = resultText;
+                // Không cần thẻ <strong> vì CSS global đã là bold
+                p.textContent = resultText; 
                 p.style.fontSize = '1.2em';
-                p.style.fontWeight = 'normal';
-                p.style.borderBottom = '1px dashed #eee'; // Thêm đường gạch ngang nhẹ
+                p.style.borderBottom = '1px dashed #eee'; 
                 p.style.padding = '8px 0';
                 p.style.margin = '0';
                 p.style.textAlign = 'left';
@@ -152,11 +140,29 @@
         
         // ========================= SOCKET.IO LOGIC =========================
 
+        // Hàm chung để tham gia phòng
+        function joinRoom(roomCode, isRejoin = false) {
+            if (!roomCode) {
+                 roomStatus.textContent = "LỖI: URL thiếu Mã phòng (roomid=).";
+                 resultsContainer.innerHTML = '<p style="text-align:center; font-size: 1em; color: red;">Vui lòng truy cập theo định dạng: **Result.html?roomid=MÃ_PHÒNG**</p>';
+                 return;
+            }
+            
+            roomStatus.textContent = `Đang tham gia Phòng: ${roomCode}...`;
+
+            if (isRejoin) {
+                socket.emit("viewer-rejoin-room", roomCode);
+            } else {
+                socket.emit("viewer-join-room", roomCode);
+            }
+        }
+        
         socket.on("connect", () => {
              console.log("Connected to server. ID:", socket.id);
              if (currentRoom) {
-                 // Xử lý reconnect: Nếu đã có phòng thì join lại (dùng event mới)
-                 socket.emit("viewer-rejoin-room", currentRoom);
+                 joinRoom(currentRoom, true);
+             } else if (initialRoomCode) {
+                 joinRoom(initialRoomCode);
              }
         });
 
@@ -164,17 +170,15 @@
         socket.on("viewer-join-success", (data) => {
             currentRoom = data.roomCode;
             roomStatus.textContent = `Đang xem kết quả Phòng: ${currentRoom}`;
-            joinButton.disabled = true;
-            roomCodeInput.disabled = true;
             renderResults(data.answers);
-            showMessage(`Tham gia phòng ${currentRoom} thành công. Tự động cập nhật đã BẬT.`, false);
+            showMessage(`Tham gia phòng ${currentRoom} thành công. Cập nhật tự động đã BẬT.`, false);
         });
 
         // Lắng nghe lỗi khi tham gia
         socket.on("join-error", (message) => {
-             joinButton.disabled = false;
-             roomCodeInput.disabled = false;
+             roomStatus.textContent = `Lỗi tham gia phòng: ${initialRoomCode}`;
              showMessage(message, true);
+             resultsContainer.innerHTML = `<p style="text-align:center; font-size: 1em; color: red;">${message}</p>`;
         });
         
         // Lắng nghe cập nhật kết quả (từ server)
@@ -188,30 +192,13 @@
             showMessage("Đáp án đã được Host/Manager reset!", true); 
         });
 
-        // Gán sự kiện cho nút Tham gia phòng (Xem Kết Quả)
-        joinButton.addEventListener('click', () => {
-            const roomCode = roomCodeInput.value.trim();
-            if (!roomCode) {
-                 showMessage("Vui lòng nhập Mã Phòng.", true);
-                 return;
-            }
-            if (roomCode.length !== 6 || isNaN(roomCode)) {
-                 showMessage("Mã phòng phải là 6 chữ số!", true);
-                 return;
-            }
-            
-            joinButton.disabled = true;
-            roomCodeInput.disabled = true;
-            
-            // Gửi event lên server để tham gia phòng xem kết quả
-            socket.emit("viewer-join-room", parseInt(roomCode));
-        });
-
+        // Khởi tạo: Đọc mã phòng từ URL và tự động tham gia
         window.onload = () => {
-             // Tự động tham gia nếu đã có mã phòng trong input
-             if (roomCodeInput.value.trim()) {
-                 joinButton.click();
-             }
+             initialRoomCode = getRoomCodeFromUrl();
+             if (socket.connected) {
+                 joinRoom(initialRoomCode);
+             } 
+             // Logic connect sẽ tự xử lý nếu socket chưa kết nối
         };
     </script>
 </body>
