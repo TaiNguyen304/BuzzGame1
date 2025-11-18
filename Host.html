@@ -313,7 +313,7 @@
         if (!lockedAnswer && answerDuration_host === 0 && answerStartTime > 0) {
             aDisp.innerHTML = `Thời gian đáp án đã mở: <span style="color:blue;">${format(now - answerStartTime)}</span>`;
         } else if (!lockedAnswer && answerDuration_host > 0 && answerStartTime > 0) {
-            const remain = answerStartTime + answerDuration_host * 1000 - now;
+            const remain = answerStartTime + answerDuration_host * 1000 - now - 5000;
             aDisp.innerHTML = `Thời gian đáp án còn lại: <span style="color:red;">${format(remain)}</span>`;
         } else {
             aDisp.innerHTML = "";
@@ -323,7 +323,7 @@
         if (!lockedBuzz && buzzDuration_host === 0 && buzzStartTime > 0) {
             bDisp.innerHTML = `Thời gian chuông đã mở: <span style="color:blue;">${format(now - buzzStartTime)}</span>`;
         } else if (!lockedBuzz && buzzDuration_host > 0 && buzzStartTime > 0) {
-            const remain = buzzStartTime + buzzDuration_host * 1000 - now;
+            const remain = buzzStartTime + buzzDuration_host * 1000 - now - 5000;
             bDisp.innerHTML = `Thời gian chuông còn lại: <span style="color:red;">${format(remain)}</span>`;
         } else {
             bDisp.innerHTML = "";
