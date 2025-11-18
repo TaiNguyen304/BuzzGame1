@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kết Quả</title>
     <style>
-        /* Thiết lập nền trắng và font chữ cơ bản */
+        /* CSS Vẫn Giữ Nguyên */
         body {
-            background-color: white; /* Nền trắng */
+            background-color: white; 
             font-family: Arial, sans-serif;
             color: black;
             margin: 0;
@@ -15,15 +15,13 @@
             overflow: auto;
         }
 
-        /* Bảng hiển thị kết quả - Tối giản, không viền, KHÔNG TIÊU ĐỀ */
         #resultsTable {
             width: 100%;
             border-collapse: collapse; 
         }
 
-        /* Các ô dữ liệu */
         #resultsTable td {
-            font-weight: bold; /* Chữ đậm đen */
+            font-weight: bold; 
             font-size: 1.2em;
             padding: 8px 15px; 
             border: none; 
@@ -31,12 +29,10 @@
             vertical-align: top;
         }
         
-        /* Phân bổ độ rộng cột */
-        #resultsTable tr td:nth-child(1) { width: 30%; } /* Cột Tên thí sinh */
-        #resultsTable tr td:nth-child(2) { width: 45%; } /* Cột Đáp án */
-        #resultsTable tr td:nth-child(3) { width: 25%; } /* Cột Thời gian */
+        #resultsTable tr td:nth-child(1) { width: 30%; } 
+        #resultsTable tr td:nth-child(2) { width: 45%; } 
+        #resultsTable tr td:nth-child(3) { width: 25%; } 
 
-        /* Giao diện nhập liệu và điều khiển */
         #inputContainer {
             margin-bottom: 20px;
             padding: 10px;
@@ -55,49 +51,38 @@
             font-weight: bold;
         }
         
-        /* Cập nhật style nút bấm (Đậm) */
         #fetchButton, #autoRefreshButton, #joinButton {
             padding: 8px 15px;
             font-size: 16px;
-            font-weight: bold; /* Chữ đậm */
+            font-weight: bold; 
             cursor: pointer;
             border: none;
             border-radius: 4px;
             transition: background-color 0.2s, color 0.2s; 
-            margin-right: 5px; /* Thêm khoảng cách giữa các nút */
+            margin-right: 5px; 
         }
 
-        /* Màu nền cơ bản */
         #fetchButton {
             background-color: blue; 
-            color: white; /* Chữ trắng */
+            color: white; 
         }
         
         #autoRefreshButton {
             background-color: red; 
-            color: white; /* Chữ trắng */
+            color: white; 
         }
         
-        /* Style cho nút Tham gia Phòng (Màu Vàng, Chữ Đen) */
-        #joinButton {
-            background-color: yellow;
-            color: black; /* Chữ đậm đen */
-        }
-        
-        /* Màu nền khi Tự động Cập nhật ĐANG BẬT */
         #autoRefreshButton.active {
             background-color: green;
         }
 
-        /* HIỆU ỨNG HOVER (Áp dụng cho tất cả nút) */
         #fetchButton:hover:not(:disabled), 
         #autoRefreshButton:hover:not(:disabled),
         #joinButton:hover:not(:disabled) {
-            background-color: orange; /* Màu cam khi hover */
-            color: white; /* Chuyển sang chữ trắng khi hover */
+            background-color: orange; 
+            color: white; 
         }
 
-        /* Đảm bảo chữ đen ở nút Tham gia chuyển sang trắng khi hover */
         #joinButton:hover:not(:disabled) {
              color: white;
         }
@@ -107,7 +92,6 @@
             cursor: not-allowed;
         }
         
-        /* Message Box styling */
         #messageBox {
             position: fixed;
             top: 50%;
@@ -128,7 +112,6 @@
 
     <div id="inputContainer">
         <input type="text" id="roomCodeInput" placeholder="Nhập Mã Phòng" value="">
-        <button id="joinButton">Tham gia phòng</button>
         <button id="fetchButton">Tải Kết Quả</button>
         <button id="autoRefreshButton" data-status="off">Tự động Cập nhật: TẮT</button>
     </div>
@@ -149,10 +132,11 @@
         const messageBox = document.getElementById('messageBox');
         
         let refreshInterval = null;
+        let lastErrorTime = 0;
+        const ERROR_COOLDOWN = 5000; // Thời gian tối thiểu giữa hai lần báo lỗi (5 giây)
 
         function showMessage(text, isError = false) {
             messageBox.textContent = text;
-            // Thay đổi màu viền dựa trên trạng thái lỗi
             messageBox.style.backgroundColor = isError ? 'red' : 'green'; 
             messageBox.style.display = 'block';
             setTimeout(() => {
@@ -160,15 +144,15 @@
             }, 3000);
         }
 
-        async function fetchAndDisplayResults() {
+        async function fetchAndDisplayResults(isManualFetch = false) {
             const roomCode = roomCodeInput.value.trim();
             if (!roomCode) {
-                showMessage("Vui lòng nhập Mã Phòng.", true);
+                if (isManualFetch) showMessage("Vui lòng nhập Mã Phòng.", true);
                 return;
             }
 
             try {
-                fetchButton.disabled = true;
+                if (isManualFetch) fetchButton.disabled = true;
 
                 const response = await fetch(`${SERVER_URL}/results`, {
                     method: 'POST',
@@ -180,7 +164,12 @@
 
                 if (!response.ok) {
                     const data = await response.json();
-                    showMessage(data.error || `Lỗi HTTP ${response.status}. Kiểm tra Server NodeJS và Mã Phòng.`, true);
+                    
+                    // Chỉ báo lỗi nếu là fetch thủ công HOẶC nếu đã qua thời gian cooldown
+                    if (isManualFetch || Date.now() - lastErrorTime > ERROR_COOLDOWN) {
+                        showMessage(data.error || `Lỗi HTTP ${response.status}. Kiểm tra Server NodeJS và Mã Phòng.`, true);
+                        lastErrorTime = Date.now();
+                    }
                     return;
                 }
                 
@@ -191,6 +180,8 @@
 
                 if (data.length === 0) {
                     resultsTable.innerHTML = '<tr><td colspan="3" style="text-align:center; font-style:italic; font-weight: normal; font-size: 1em;">Chưa có đáp án nào được gửi.</td></tr>';
+                    // Chỉ hiển thị thông báo thành công khi fetch thủ công
+                    if (isManualFetch) showMessage(`Đã tải 0 kết quả thành công.`, false);
                     return;
                 }
 
@@ -208,26 +199,29 @@
                     cellTime.textContent = `${item.time.toFixed(2)}s`;
                 });
 
-                if (autoRefreshButton.getAttribute('data-status') === 'off') {
-                    showMessage(`Đã tải ${data.length} kết quả thành công.`, false);
-                }
+                if (isManualFetch) showMessage(`Đã tải ${data.length} kết quả thành công.`, false);
 
             } catch (error) {
                 console.error("Fetch Error:", error);
-                showMessage(`LỖI KẾT NỐI: Server NodeJS (${SERVER_URL}) không phản hồi.`, true);
+                
+                // Chỉ báo lỗi nếu là fetch thủ công HOẶC nếu đã qua thời gian cooldown
+                if (isManualFetch || Date.now() - lastErrorTime > ERROR_COOLDOWN) {
+                    showMessage(`LỖI KẾT NỐI: Server NodeJS (${SERVER_URL}) không phản hồi. Server có thể đang ngủ (cold start).`, true);
+                    lastErrorTime = Date.now();
+                }
             } finally {
-                fetchButton.disabled = false;
+                if (isManualFetch) fetchButton.disabled = false;
             }
         }
         
         function toggleAutoRefresh() {
             if (autoRefreshButton.getAttribute('data-status') === 'off') {
-                fetchAndDisplayResults(); 
-                refreshInterval = setInterval(fetchAndDisplayResults, 1000); 
+                fetchAndDisplayResults(false); 
+                refreshInterval = setInterval(() => fetchAndDisplayResults(false), 3000); 
                 autoRefreshButton.setAttribute('data-status', 'on');
                 autoRefreshButton.textContent = 'Tự động Cập nhật: BẬT';
                 autoRefreshButton.classList.add('active');
-                showMessage("Đã bật tự động cập nhật (1s).", false);
+                showMessage("Đã bật tự động cập nhật.", false);
             } else {
                 // Tắt tự động cập nhật
                 clearInterval(refreshInterval);
@@ -239,18 +233,19 @@
             }
         }
         
-        // Gán sự kiện cho các nút
-        fetchButton.addEventListener('click', fetchAndDisplayResults);
+        // Gán sự kiện cho nút Tải Kết Quả, truyền tham số true để xử lý lỗi như fetch thủ công
+        fetchButton.addEventListener('click', () => fetchAndDisplayResults(true));
         autoRefreshButton.addEventListener('click', toggleAutoRefresh);
         
-        // Xử lý sự kiện cho nút Tham gia phòng (chỉ hiển thị thông báo)
+        // Xử lý sự kiện cho nút Tham gia phòng
         joinButton.addEventListener('click', () => {
              showMessage(`Trang này chỉ dùng để hiển thị kết quả.`, false);
         });
 
         window.onload = () => {
              if (roomCodeInput.value.trim()) {
-                 fetchAndDisplayResults();
+                 // Fetch lần đầu khi tải trang
+                 fetchAndDisplayResults(true);
              }
         };
     </script>
