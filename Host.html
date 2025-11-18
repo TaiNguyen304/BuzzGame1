@@ -52,11 +52,18 @@
       padding: 10px;
       border: 1px solid #aaa;
       border-radius: 6px;
-      font-weight: bold;
+      /* font-weight: bold;  <-- GIỮ NGUYÊN NẾU MUỐN MỌI THỨ IN ĐẬM */
       word-wrap: break-word;
       overflow-wrap: break-word;
       list-style-position: inside;
     }
+    
+    /* === ĐIỀU CHỈNH: Đảm bảo các giá trị trong buzz list là bold và kế thừa Arial === */
+    #buzzList li {
+        font-weight: bold; 
+    }
+    /* === KẾT THÚC ĐIỀU CHỈNH === */
+
 
     #roomInfo {
       font-size: 1.2em;
@@ -449,7 +456,6 @@
       if (ms < 0) ms = 0;
       const totalSeconds = Math.floor(ms / 1000);
       const milliseconds = ms % 1000; // Lấy 3 chữ số thập phân
-      // Bỏ padStart(2, '0') để không có số 0 đứng đầu (ví dụ: 9.234s thay vì 09.234s)
       return `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
     }
 
@@ -463,7 +469,6 @@
         const totalSeconds = Math.floor(elapsed / 1000);
         const milliseconds = elapsed % 1000; // Lấy 3 chữ số thập phân
         
-        // Bỏ padStart(2, '0') để không có số 0 đứng đầu
         return `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
     }
 
@@ -474,7 +479,6 @@
       answers.forEach((item, index) => {
         const row = tblAnswersBody.insertRow();
         const timeElapsed = formatTime(item.ts, answerStartTime); // Sử dụng hàm formatTime
-        // THAY ĐỔI: Xóa dòng row.insertCell().innerText = index + 1;
         row.insertCell().innerText = item.name;
         row.insertCell().innerText = item.answer;
         row.insertCell().innerText = timeElapsed;
@@ -488,7 +492,7 @@
       buzzOrder.forEach((item, index) => {
         const timeElapsed = formatTime(item.ts, buzzStartTime); // Sử dụng hàm formatTime
         const li = document.createElement("li");
-        li.innerHTML = `<b>${item.name}</b> - Thời gian: ${timeElapsed}`;
+        li.innerText = `${item.name} - ${timeElapsed}`;
         buzzList.appendChild(li);
       });
     }
