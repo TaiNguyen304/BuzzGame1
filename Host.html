@@ -73,10 +73,29 @@
       transition: all 0.25s ease;
     }
 
+    /* Thêm style cho 3 nút trên cùng */
+    .top-buttons-group button {
+      height: 40px;
+      padding: 0 15px;
+    }
+
     #btnCreate {
       background: purple;
       color: white;
     }
+
+    /* Style cho nút "Tham gia phòng (Quản lý)" */
+    #btnJoinManager {
+      background: blue;
+      color: white;
+    }
+
+    /* Style cho nút "Danh sách tham gia" */
+    #btnListUsers {
+      background: yellow;
+      color: black;
+    }
+
 
     #unlockAnswersLimited,
     #unlockBuzzLimited {
@@ -177,7 +196,96 @@
       font-size: 1.1em;
       font-weight: bold;
       margin-top: 10px;
-      height: 25px; /* Giữ chỗ để tránh nhảy layout */
+      height: 25px;
+      /* Giữ chỗ để tránh nhảy layout */
+    }
+
+
+    /* =================== Popup Styles =================== */
+    .popup-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1001;
+    }
+
+    .popup-content {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    .popup-content h3 {
+      margin-top: 0;
+    }
+
+    .popup-inputs input {
+      display: block;
+      margin: 10px auto;
+      width: 80%;
+      max-width: 300px;
+    }
+
+    .popup-buttons {
+      margin-top: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    #btnConfirmManager {
+      background: green;
+      color: white;
+    }
+
+    #btnCloseJoin {
+      background: red;
+      color: white;
+    }
+
+    /* Styles cho Danh sách tham gia */
+    #userListContainer {
+      max-height: 400px;
+      overflow-y: auto;
+      text-align: left;
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 15px;
+    }
+
+    #userListContainer ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    #userListContainer li {
+      padding: 5px 0;
+      border-bottom: 1px dotted #eee;
+    }
+
+    .role-host {
+      color: blue;
+      font-weight: bold;
+    }
+
+    .role-manager {
+      color: red;
+      font-weight: bold;
+    }
+
+    .role-contestant {
+      color: black;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -186,13 +294,19 @@
   <h1>Host Panel</h1>
 
   <div id="roomInfo"></div>
-  <button id="btnCreate">Tạo phòng</button><br><br>
+
+  <div class="top-buttons-group">
+    <button id="btnCreate">Tạo phòng</button>
+    <button id="btnJoinManager">Tham gia phòng (Quản lý)</button>
+    <button id="btnListUsers">Danh sách tham gia</button>
+  </div>
+  <br><br>
 
   <div>
     <div class="status-box locked" id="statusAnswer">Đáp án: 🔒 Đang khóa</div>
     <div class="status-box locked" id="statusBuzz">Chuông: 🚫 Đang khóa</div>
   </div>
-  
+
   <div class="time-elapsed-display" id="answerTimeElapsed"></div>
   <div class="time-elapsed-display" id="buzzTimeElapsed"></div>
 
@@ -233,6 +347,33 @@
 
   <div id="popupMessage"></div>
 
+  <div id="joinPopup" class="popup-overlay">
+    <div class="popup-content">
+      <h3>Tham gia phòng (Quản lý)</h3>
+      <div class="popup-inputs">
+        <input type="text" id="managerRoomCode" placeholder="Mã phòng (6 số)">
+        <input type="text" id="managerName" placeholder="Tên quản lý">
+      </div>
+      <div class="popup-buttons">
+        <button id="btnConfirmManager">Xác nhận</button>
+        <button id="btnCloseJoin">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="listPopup" class="popup-overlay">
+    <div class="popup-content">
+      <h3>Danh sách tham gia</h3>
+      <div id="userListContainer">
+        <ul></ul>
+      </div>
+      <div class="popup-buttons">
+        <button id="btnCloseList" style="background: red; color: white;">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
   <script>
@@ -249,10 +390,12 @@
     let buzzDuration_host = 0; // Thêm: Lưu trữ thời lượng chuông
     let hostTimerInterval = null; // Thêm: Interval để cập nhật thời gian
     let currentRoom = null;
+    let myRole = "Host"; // Vai trò của socket hiện tại: Host, Manager, null
+    let myName = "Host"; // Tên hiển thị trong danh sách người dùng
 
     // Hàm định dạng thời gian (Dùng chung cho cả elapsed và remaining)
     function format(ms) {
-        return (Math.max(0,ms)/1000).toFixed(3)+"s";
+      return (Math.max(0, ms) / 1000).toFixed(3) + "s";
     }
 
     function formatTime(ts, start) {
@@ -305,47 +448,54 @@
 
     // THÊM: Hàm cập nhật hiển thị thời gian trôi qua/còn lại theo thời gian thực
     function updateElapsedDisplay() {
-        const now = Date.now();
-        const aDisp = document.getElementById("answerTimeElapsed");
-        const bDisp = document.getElementById("buzzTimeElapsed");
+      const now = Date.now();
+      const aDisp = document.getElementById("answerTimeElapsed");
+      const bDisp = document.getElementById("buzzTimeElapsed");
 
-        // Answer Time
-        if (!lockedAnswer && answerDuration_host === 0 && answerStartTime > 0) {
-        } else if (!lockedAnswer && answerDuration_host > 0 && answerStartTime > 0) {
-            const remain = answerStartTime + answerDuration_host * 1000 - now - 5000;
-            aDisp.innerHTML = `Thời gian đáp án còn lại: <span style="color:red;">${format(remain)}</span>`;
-        } else {
-            aDisp.innerHTML = "";
-        }
+      // Answer Time
+      if (!lockedAnswer && answerDuration_host === 0 && answerStartTime > 0) {
+        aDisp.innerHTML = `Thời gian đáp án đã trôi qua: <span style="color:green;">${format(now - answerStartTime)}</span> (Vĩnh viễn)`;
+      } else if (!lockedAnswer && answerDuration_host > 0 && answerStartTime > 0) {
+        // - 5000 là khoảng buffer 5 giây được trừ ở server
+        const remain = answerStartTime + answerDuration_host * 1000 - now - 5000;
+        aDisp.innerHTML = `Thời gian đáp án còn lại: <span style="color:red;">${format(remain)}</span>`;
+      } else {
+        aDisp.innerHTML = "";
+      }
 
-        // Buzz Time
-        if (!lockedBuzz && buzzDuration_host === 0 && buzzStartTime > 0) {
-        } else if (!lockedBuzz && buzzDuration_host > 0 && buzzStartTime > 0) {
-            const remain = buzzStartTime + buzzDuration_host * 1000 - now - 5000;
-            bDisp.innerHTML = `Thời gian chuông còn lại: <span style="color:red;">${format(remain)}</span>`;
-        } else {
-            bDisp.innerHTML = "";
-        }
+      // Buzz Time
+      if (!lockedBuzz && buzzDuration_host === 0 && buzzStartTime > 0) {
+        bDisp.innerHTML = `Thời gian chuông đã trôi qua: <span style="color:green;">${format(now - buzzStartTime)}</span> (Vĩnh viễn)`;
+      } else if (!lockedBuzz && buzzDuration_host > 0 && buzzStartTime > 0) {
+        // - 5000 là khoảng buffer 5 giây được trừ ở server
+        const remain = buzzStartTime + buzzDuration_host * 1000 - now - 5000;
+        bDisp.innerHTML = `Thời gian chuông còn lại: <span style="color:red;">${format(remain)}</span>`;
+      } else {
+        bDisp.innerHTML = "";
+      }
     }
 
 
     // ========== Tạo phòng ==========
     document.getElementById("btnCreate").onclick = () => {
+      if (currentRoom) return showPopup(`Bạn đã ở trong phòng ${currentRoom} với vai trò ${myRole}!`, "error");
       const code = Math.floor(100000 + Math.random() * 900000);
       socket.emit("host-create-room", code);
     };
 
     socket.on("room-created", code => {
       currentRoom = code;
+      myRole = "Host";
+      myName = "Host"; // Tên mặc định
       document.getElementById("roomInfo").innerHTML =
-        `🔑 <b>Mã phòng:</b> <span style="font-size:1.5em">${code}</span>`;
+        `🔑 <b>Mã phòng:</b> <span style="font-size:1.5em">${code}</span> | <b>Vai trò:</b> <span class="role-host">HOST</span>`;
       answers = [];
       buzzOrder = [];
       renderAnswers();
       renderBuzzList();
       updateStatusDisplay();
       showPopup("Tạo phòng thành công!");
-      
+
       // BẮT ĐẦU TIMER
       if (hostTimerInterval) clearInterval(hostTimerInterval);
       hostTimerInterval = setInterval(updateElapsedDisplay, 50);
@@ -365,8 +515,10 @@
     });
 
     // ========== Điều khiển Đáp án ==========
+    // Logic của nút điều khiển không thay đổi, vì Quản lý có thể bấm được do server cho phép
+
     document.getElementById("unlockAnswersLimited").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
+      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
       const duration = Math.max(1, parseInt(answerDuration.value) || 0);
       socket.emit("host-toggle-answer", {
         roomCode: currentRoom,
@@ -376,7 +528,7 @@
     };
 
     document.getElementById("unlockAnswersPermanent").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
+      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
       socket.emit("host-toggle-answer", {
         roomCode: currentRoom,
         state: "open",
@@ -385,7 +537,7 @@
     };
 
     document.getElementById("lockAnswers").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
+      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
       socket.emit("host-toggle-answer", {
         roomCode: currentRoom,
         state: "locked"
@@ -393,7 +545,7 @@
     };
 
     document.getElementById("resetAnswers").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
+      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
       answers = [];
       renderAnswers();
       showPopup("Đã reset đáp án");
@@ -401,7 +553,7 @@
 
     // ========== Điều khiển Chuông ==========
     document.getElementById("unlockBuzzLimited").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
+      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
       const duration = Math.max(1, parseInt(buzzDuration.value) || 0);
       socket.emit("host-toggle-buzz", {
         roomCode: currentRoom,
@@ -411,17 +563,17 @@
     };
 
     document.getElementById("unlockBuzzPermanent").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
+      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
       socket.emit("host-toggle-buzz", { roomCode: currentRoom, state: "open", duration: 0 });
     };
 
     document.getElementById("lockBuzz").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
+      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
       socket.emit("host-toggle-buzz", { roomCode: currentRoom, state: "locked" });
     };
 
     document.getElementById("resetBuzz").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo phòng trước!", "error");
+      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
       buzzOrder = [];
       renderBuzzList();
       showPopup("Đã reset chuông");
@@ -444,6 +596,97 @@
       updateElapsedDisplay();
     });
 
+    // ========== POPUP Tham gia phòng (Quản lý) ==========
+    document.getElementById("btnJoinManager").onclick = () => {
+      document.getElementById("joinPopup").style.display = "flex";
+      // Clear inputs
+      document.getElementById("managerRoomCode").value = currentRoom || "";
+      document.getElementById("managerName").value = myName === "Host" ? "" : myName;
+    };
+
+    document.getElementById("btnCloseJoin").onclick = () => {
+      document.getElementById("joinPopup").style.display = "none";
+    };
+
+    document.getElementById("btnConfirmManager").onclick = () => {
+      const code = document.getElementById("managerRoomCode").value.trim();
+      const name = document.getElementById("managerName").value.trim();
+
+      if (!code || !name) return showPopup("Nhập mã phòng + tên!", "error");
+      if (code.length !== 6) return showPopup("Mã phòng phải 6 số!", "error");
+
+      socket.emit("manager-join-room", {
+        roomCode: parseInt(code),
+        name
+      });
+    };
+
+    socket.on("manager-join-success", ({ roomCode, name }) => {
+      document.getElementById("joinPopup").style.display = "none";
+      currentRoom = roomCode;
+      myRole = "Manager";
+      myName = name;
+      document.getElementById("roomInfo").innerHTML =
+        `🔑 <b>Mã phòng:</b> <span style="font-size:1.5em">${roomCode}</span> | <b>Vai trò:</b> <span class="role-manager">QUẢN LÝ (${name})</span>`;
+      answers = [];
+      buzzOrder = [];
+      renderAnswers();
+      renderBuzzList();
+      updateStatusDisplay();
+      showPopup("Tham gia phòng Quản lý thành công!");
+
+      // BẮT ĐẦU TIMER
+      if (hostTimerInterval) clearInterval(hostTimerInterval);
+      hostTimerInterval = setInterval(updateElapsedDisplay, 50);
+    });
+
+    socket.on("join-manager-failed", msg => showPopup(msg, "error"));
+
+    // ========== POPUP Danh sách tham gia ==========
+    document.getElementById("btnListUsers").onclick = () => {
+      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước để xem danh sách!", "error");
+      socket.emit("host-request-userlist", currentRoom);
+    };
+
+    document.getElementById("btnCloseList").onclick = () => {
+      document.getElementById("listPopup").style.display = "none";
+    };
+
+    socket.on("host-receive-userlist", ({ host, managers, contestants }) => {
+      const ul = document.querySelector("#userListContainer ul");
+      ul.innerHTML = "";
+
+      // 1. Host
+      if (host && host.id) {
+        const li = document.createElement("li");
+        const isSelf = host.id === socket.id;
+        li.innerHTML = `**${isSelf ? `(Bạn) ` : ''}** ${host.name || 'Host'} <span class="role-host">(HOST)</span>`;
+        ul.appendChild(li);
+      } else {
+        const li = document.createElement("li");
+        li.innerHTML = `**Host** <span class="role-host">(Chưa kết nối)</span>`;
+        ul.appendChild(li);
+      }
+      
+      // 2. Managers
+      managers.forEach(m => {
+        const li = document.createElement("li");
+        const isSelf = m.id === socket.id;
+        li.innerHTML = `**${isSelf ? `(Bạn) ` : ''}** ${m.name} <span class="role-manager">(Quản lý)</span>`;
+        ul.appendChild(li);
+      });
+
+      // 3. Contestants
+      contestants.forEach(c => {
+        const li = document.createElement("li");
+        li.innerHTML = `**${c.name}** <span class="role-contestant">(Thí sinh)</span>`;
+        ul.appendChild(li);
+      });
+
+      document.getElementById("listPopup").style.display = "flex";
+    });
+
+    // Khởi tạo trạng thái ban đầu
     updateStatusDisplay();
   </script>
 
