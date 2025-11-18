@@ -448,36 +448,32 @@
     function format(ms) {
       if (ms < 0) ms = 0;
       const totalSeconds = Math.floor(ms / 1000);
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      const milliseconds = Math.floor((ms % 1000) / 100); // Lấy 1 chữ số thập phân
-      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds}`;
+      const milliseconds = ms % 1000; // Lấy 3 chữ số thập phân
+      // Trả về định dạng giây.tích tắc (ss.ttt)
+      return `${totalSeconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
     }
 
-    // Hàm format thời gian (dùng cho xuất Excel)
+    // Hàm format thời gian (dùng cho xuất Excel và hiển thị bảng)
     function formatTime(ts, startTime) {
-        if (startTime === 0) return "00:00.0"; // Nếu chưa có thời gian bắt đầu
+        if (startTime === 0) return "00.000"; // Nếu chưa có thời gian bắt đầu
         
         const elapsed = ts - startTime; // Khoảng thời gian tính từ lúc bắt đầu
-        if (elapsed < 0) return "00:00.0 (Lỗi)";
-
+        if (elapsed < 0) return "00.000 (Lỗi)";
+        
         const totalSeconds = Math.floor(elapsed / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        const milliseconds = Math.floor((elapsed % 1000) / 100);
-        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds}`;
+        const milliseconds = elapsed % 1000; // Lấy 3 chữ số thập phân
+        
+        // Trả về định dạng giây.tích tắc (ss.ttt)
+        return `${totalSeconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
     }
-
 
     // Hàm cập nhật hiển thị bảng đáp án
     function renderAnswers() {
       tblAnswersBody.innerHTML = ""; // Xóa nội dung cũ
       answers.sort((a, b) => a.ts - b.ts); // Sắp xếp theo thời gian gửi
-
       answers.forEach((item, index) => {
         const row = tblAnswersBody.insertRow();
         const timeElapsed = formatTime(item.ts, answerStartTime); // Sử dụng hàm formatTime
-
         // THAY ĐỔI: Xóa dòng row.insertCell().innerText = index + 1;
         row.insertCell().innerText = item.name;
         row.insertCell().innerText = item.answer;
@@ -489,7 +485,6 @@
     function renderBuzzList() {
       buzzList.innerHTML = ""; // Xóa nội dung cũ
       buzzOrder.sort((a, b) => a.ts - b.ts); // Sắp xếp theo thời gian bấm
-
       buzzOrder.forEach((item, index) => {
         const timeElapsed = formatTime(item.ts, buzzStartTime); // Sử dụng hàm formatTime
         const li = document.createElement("li");
@@ -508,14 +503,14 @@
       sB.innerText = lockedBuzz ? "Chuông: 🚫 Đang khóa" : "Chuông: 🔔 Đang mở";
     }
 
-    // THAY ĐỔI: Hàm cập nhật hiển thị thời gian
+    // Hàm cập nhật hiển thị thời gian đã trôi qua/còn lại
     function updateElapsedDisplay() {
       const now = Date.now();
       const aDisp = document.getElementById("answerTimeElapsed");
       const bDisp = document.getElementById("buzzTimeElapsed");
 
-      // Answer Time
-      if (!lockedAnswer && answerDuration_host === 0 && answerStartTime > 0) {
+      // Đồng hồ đáp án
+      if (!lockedAnswer && answerDuration_host === 0) {
         // Mở vĩnh viễn (không cần hiển thị)
         aDisp.innerHTML = "";
       } else if (!lockedAnswer && answerDuration_host > 0 && answerEndTime_host > 0) {
@@ -526,8 +521,8 @@
         aDisp.innerHTML = "";
       }
 
-      // Buzz Time
-      if (!lockedBuzz && buzzDuration_host === 0 && buzzStartTime > 0) {
+      // Đồng hồ chuông
+      if (!lockedBuzz && buzzDuration_host === 0) {
         // Mở vĩnh viễn (không cần hiển thị)
         bDisp.innerHTML = "";
       } else if (!lockedBuzz && buzzDuration_host > 0 && buzzEndTime_host > 0) {
@@ -577,7 +572,6 @@
       if (typeof XLSX === 'undefined') return showPopup("Lỗi: Không thể tải thư viện Excel (XLSX).", "error");
 
       // 1. Chuẩn bị dữ liệu cho Sheet 1: Đáp án
-      // THAY ĐỔI: Xóa cột "STT"
       const ws1_data = [
         ["Tên người chơi", "Đáp án", "Thời gian"] // Hàng tiêu đề
       ];
@@ -586,7 +580,7 @@
           x.name,
           x.answer,
           // Dùng startTime (gốc) để tính toán
-          formatTime(x.ts, answerStartTime)
+          formatTime(x.ts, answerStartTime) // Dùng hàm formatTime đã cập nhật
         ]);
       });
 
@@ -598,7 +592,7 @@
         ws2_data.push([
           x.name,
           // Dùng startTime (gốc) để tính toán
-          formatTime(x.ts, buzzStartTime)
+          formatTime(x.ts, buzzStartTime) // Dùng hàm formatTime đã cập nhật
         ]);
       });
 
@@ -614,15 +608,14 @@
       XLSX.utils.book_append_sheet(wb, ws2, "KetQua_Buzz");
 
       // 4. Tải file
-      const filename = `KetQua_Phong_${currentRoom}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const filename = `KetQua_Phong_${currentRoom}_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
       XLSX.writeFile(wb, filename);
-
-      showPopup("Đã xuất kết quả ra Excel!");
+      showPopup("Đã xuất kết quả ra file Excel!");
     };
 
 
     // ===========================================
-    // ========== SOCKET.IO LISTENERS ============
+    // ============ SOCKET.IO LOGIC ==============
     // ===========================================
 
     // Lắng nghe khi kết nối
@@ -639,38 +632,33 @@
       myName = "Host";
       myRole = "Host";
       roomInfo.innerText = `Phòng: ${currentRoom} | Vai trò: Host`;
-
       // Cập nhật dữ liệu cũ nếu có (trường hợp re-host)
       answers = data.answers || [];
       buzzOrder = data.buzzOrder || [];
       renderAnswers();
       renderBuzzList();
-
       showPopup(`Đã tạo phòng ${currentRoom}`);
     });
 
     // Lắng nghe khi tham gia phòng với vai trò Quản lý thành công
     socket.on("manager-join-success", (data) => {
-        currentRoom = data.roomCode;
-        myName = data.name;
-        myRole = "Manager";
-        roomInfo.innerText = `Phòng: ${currentRoom} | Vai trò: Quản lý (${myName})`;
-
-        // Cập nhật dữ liệu cũ
-        answers = data.answers || [];
-        buzzOrder = data.buzzOrder || [];
-        renderAnswers();
-        renderBuzzList();
-        
-        document.getElementById("joinPopup").style.display = "none";
-        showPopup(`Tham gia phòng ${currentRoom} thành công với vai trò Quản lý!`);
+      currentRoom = data.roomCode;
+      myName = data.name;
+      myRole = "Manager";
+      roomInfo.innerText = `Phòng: ${currentRoom} | Vai trò: Quản lý (${myName})`;
+      // Cập nhật dữ liệu cũ
+      answers = data.answers || [];
+      buzzOrder = data.buzzOrder || [];
+      renderAnswers();
+      renderBuzzList();
+      document.getElementById("joinPopup").style.display = "none";
+      showPopup(`Tham gia phòng ${currentRoom} thành công với vai trò Quản lý!`);
     });
 
     // Lắng nghe lỗi khi tham gia
     socket.on("join-error", (message) => {
       showPopup(message, "error");
     });
-
 
     // ========== Nhận dữ liệu ==========
     socket.on("host-new-answer", data => {
@@ -689,18 +677,17 @@
 
     // ========== Đồng bộ hóa Reset Đáp án ==========
     socket.on("answers-reset", () => {
-        answers = [];
-        renderAnswers();
-        showPopup("Đáp án đã được Host/Manager reset!");
-    });
-    
-    // ========== Đồng bộ hóa Reset Chuông ==========
-    socket.on("buzz-reset", () => {
-        buzzOrder = [];
-        renderBuzzList();
-        showPopup("Chuông đã được Host/Manager reset!");
+      answers = [];
+      renderAnswers();
+      showPopup("Đáp án đã được Host/Manager reset!");
     });
 
+    // ========== Đồng bộ hóa Reset Chuông ==========
+    socket.on("buzz-reset", () => {
+      buzzOrder = [];
+      renderBuzzList();
+      showPopup("Chuông đã được Host/Manager reset!");
+    });
 
     // ========== Điều khiển Đáp án ==========
     document.getElementById("unlockAnswersLimited").onclick = () => {
@@ -720,9 +707,9 @@
     };
 
     document.getElementById("resetAnswers").onclick = () => {
-        if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
-        // Gửi yêu cầu reset lên server, server sẽ xử lý xóa data và broadcast lại cho tất cả
-        socket.emit("host-reset-answers", currentRoom);
+      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
+      // Gửi yêu cầu reset lên server, server sẽ xử lý xóa data và broadcast lại cho tất cả
+      socket.emit("host-reset-answers", currentRoom);
     };
 
     // ========== Điều khiển Chuông ==========
@@ -743,9 +730,9 @@
     };
 
     document.getElementById("resetBuzz").onclick = () => {
-        if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
-        // Gửi yêu cầu reset lên server, server sẽ xử lý xóa data và broadcast lại cho tất cả
-        socket.emit("host-reset-buzz", currentRoom);
+      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
+      // Gửi yêu cầu reset lên server, server sẽ xử lý xóa data và broadcast lại cho tất cả
+      socket.emit("host-reset-buzz", currentRoom);
     };
 
 
@@ -760,14 +747,11 @@
           // Tính thời điểm kết thúc THEO ĐỒNG HỒ HOST
           answerEndTime_host = Date.now() + (answerDuration_host * 1000);
         } else {
-          answerEndTime_host = 0; // Mở vĩnh viễn, không đếm ngược
+          answerEndTime_host = 0;
         }
-      } else {
-        // state === "locked"
-        answerEndTime_host = 0; // Khóa, dừng đếm ngược
       }
       updateStatusDisplay();
-      // Interval sẽ tự cập nhật hiển thị thời gian
+      showPopup(`Đáp án: ${lockedAnswer ? 'Đã Khóa' : 'Đã Mở'} (Thời gian: ${duration ? duration + 's' : 'Vĩnh viễn'})`);
     });
 
     socket.on("buzz-status-changed", ({ state, duration, startTime }) => {
@@ -780,16 +764,18 @@
           // Tính thời điểm kết thúc THEO ĐỒNG HỒ HOST
           buzzEndTime_host = Date.now() + (buzzDuration_host * 1000);
         } else {
-          buzzEndTime_host = 0; // Mở vĩnh viễn, không đếm ngược
+          buzzEndTime_host = 0;
         }
-      } else {
-        // state === "locked"
-        buzzEndTime_host = 0; // Khóa, dừng đếm ngược
       }
       updateStatusDisplay();
-      // Interval sẽ tự cập nhật hiển thị thời gian
+      showPopup(`Chuông: ${lockedBuzz ? 'Đã Khóa' : 'Đã Mở'} (Thời gian: ${duration ? duration + 's' : 'Vĩnh viễn'})`);
     });
 
+    // ========== TẠO PHÒNG ==========
+    document.getElementById("btnCreate").onclick = () => {
+      const roomCode = Math.floor(100000 + Math.random() * 900000);
+      socket.emit("host-create-room", roomCode);
+    };
 
     // ========== POPUP Tham gia phòng (Quản lý) ==========
     document.getElementById("btnJoinManager").onclick = () => {
@@ -810,13 +796,13 @@
         return showPopup("Mã phòng phải là 6 chữ số!", "error");
       }
       if (name.length < 1) {
-        return showPopup("Vui lòng nhập tên quản lý!", "error");
+        return showPopup("Vui lòng nhập Tên quản lý!", "error");
       }
 
       socket.emit("manager-join-room", { roomCode: parseInt(code), name });
     };
 
-    // ========== POPUP Danh sách tham gia ==========
+    // ========== POPUP Danh sách tham gia ==========\
     document.getElementById("btnListUsers").onclick = () => {
       if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
       socket.emit("host-get-users", currentRoom);
@@ -845,13 +831,13 @@
       showPopup(`[${user.role}] đã rời phòng.`, 'error'); // Không có tên, hiển thị chung
     });
 
-    // ========== TẠO PHÒNG ==========
+    // ========== TẠO PHÒNG BAN ĐẦU (NẾU CHƯA CÓ) ==========
     document.getElementById("btnCreate").onclick = () => {
       const roomCode = Math.floor(100000 + Math.random() * 900000); // Mã phòng 6 chữ số
       socket.emit("host-create-room", roomCode);
     };
-
   </script>
 </body>
 
 </html>
+
