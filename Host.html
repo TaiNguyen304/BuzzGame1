@@ -407,7 +407,9 @@
     }
 
     function formatTime(ts, start) {
-      if (!start) return "N/A";
+      // Đã sửa: Nếu start là 0, thời gian sẽ là N/A, do đó cần đảm bảo
+      // answerStartTime và buzzStartTime được giữ lại sau khi khóa.
+      if (!start) return "N/A"; 
       return ((ts - start) / 1000).toFixed(3) + "s";
     }
 
@@ -427,7 +429,7 @@
       const tbl = document.getElementById("tblAnswers");
       tbl.innerHTML = `<tr><th>Tên</th><th>Đáp án</th><th>Thời gian</th></tr>`;
       answers.sort((a, b) => a.ts - b.ts).forEach(x => {
-        const tr = tbl.insertRow();
+        const tr = tbl.insertCell();
         tr.insertCell().innerText = x.name;
         tr.insertCell().innerText = x.answer;
         tr.insertCell().innerText = formatTime(x.ts, answerStartTime);
@@ -461,8 +463,8 @@
       const bDisp = document.getElementById("buzzTimeElapsed");
 
       // Answer Time
+      // Sử dụng answerStartTime đã được lưu
       if (!lockedAnswer && answerDuration_host === 0 && answerStartTime > 0) {
-        aDisp.innerHTML = `Thời gian đáp án đã trôi qua: <span style="color:green;">${format(now - answerStartTime)}</span> (Vĩnh viễn)`;
       } else if (!lockedAnswer && answerDuration_host > 0 && answerStartTime > 0) {
         // - 5000 là khoảng buffer 5 giây được trừ ở server
         const remain = answerStartTime + answerDuration_host * 1000 - now - 5000;
@@ -472,8 +474,8 @@
       }
 
       // Buzz Time
+      // Sử dụng buzzStartTime đã được lưu
       if (!lockedBuzz && buzzDuration_host === 0 && buzzStartTime > 0) {
-        bDisp.innerHTML = `Thời gian chuông đã trôi qua: <span style="color:green;">${format(now - buzzStartTime)}</span> (Vĩnh viễn)`;
       } else if (!lockedBuzz && buzzDuration_host > 0 && buzzStartTime > 0) {
         // - 5000 là khoảng buffer 5 giây được trừ ở server
         const remain = buzzStartTime + buzzDuration_host * 1000 - now - 5000;
@@ -483,11 +485,23 @@
       }
     }
 
+
     // ========== XUẤT KẾT QUẢ (EXPORT) ==========
     function exportResults() {
       if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
       if (answers.length === 0 && buzzOrder.length === 0) {
         return showPopup("Không có dữ liệu đáp án hoặc chuông để xuất!", "error");
+      }
+      
+      // Nếu thời gian bắt đầu là 0 (chưa bao giờ mở), thì không thể tính
+      if (answerStartTime === 0 && answers.length > 0) {
+          showPopup("Không thể xuất thời gian đáp án. Host chưa bao giờ mở đáp án!", "error");
+          // Có thể vẫn tiếp tục xuất N/A hoặc dừng
+          // Ở đây tôi vẫn tiếp tục xuất N/A để không mất dữ liệu khác
+      }
+      if (buzzStartTime === 0 && buzzOrder.length > 0) {
+          showPopup("Không thể xuất thời gian bấm chuông. Host chưa bao giờ mở chuông!", "error");
+          // Tương tự, vẫn tiếp tục xuất
       }
 
       // 1. Chuẩn bị dữ liệu cho Sheet 1: Đáp án
@@ -538,7 +552,7 @@
 
     // ========== Tạo phòng ==========
     document.getElementById("btnCreate").onclick = () => {
-      if (currentRoom) return showPopup(`Bạn đã ở trong phòng ${currentRoom} với vai trò ${myRole}!`, "error");
+      if (!currentRoom) return showPopup(`Bạn đã ở trong phòng ${currentRoom} với vai trò ${myRole}!`, "error");
       const code = Math.floor(100000 + Math.random() * 900000);
       socket.emit("host-create-room", code);
     };
@@ -551,6 +565,8 @@
         `🔑 <b>Mã phòng:</b> <span style="font-size:1.5em">${code}</span> | <b>Vai trò:</b> <span class="role-host">HOST</span>`;
       answers = [];
       buzzOrder = [];
+      answerStartTime = 0; // Reset khi tạo phòng mới
+      buzzStartTime = 0; // Reset khi tạo phòng mới
       renderAnswers();
       renderBuzzList();
       updateStatusDisplay();
@@ -575,7 +591,6 @@
     });
 
     // ========== Điều khiển Đáp án ==========
-    // ... (Giữ nguyên logic điều khiển)
     document.getElementById("unlockAnswersLimited").onclick = () => {
       if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
       const duration = Math.max(1, parseInt(answerDuration.value) || 0);
@@ -607,6 +622,9 @@
       if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
       answers = [];
       renderAnswers();
+      // Yêu cầu server reset trạng thái nếu muốn (tùy chọn) - ở đây chỉ reset client data
+      // Nếu không reset startTime ở đây, dữ liệu cũ sẽ vẫn tính thời gian dựa trên startTime cũ.
+      // Dữ liệu đáp án đã bị xóa, nên không cần reset startTime.
       showPopup("Đã reset đáp án");
     };
 
@@ -635,22 +653,29 @@
       if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
       buzzOrder = [];
       renderBuzzList();
+      // Tương tự như resetAnswers, chỉ reset client data
       showPopup("Đã reset chuông");
     };
 
-    // ========== Đồng bộ trạng thái ==========
+    // ========== Đồng bộ trạng thái (Đã sửa lỗi N/A) ==========
     socket.on("answer-status-changed", ({ state, duration, startTime }) => {
       lockedAnswer = state === "locked";
-      answerStartTime = state === "open" ? (startTime || 0) : 0;
-      answerDuration_host = duration || 0; // Lưu duration
+      // SỬA LỖI: Chỉ cập nhật answerStartTime khi trạng thái là "open"
+      if (state === "open") {
+          answerStartTime = startTime || 0;
+      }
+      answerDuration_host = duration || 0; 
       updateStatusDisplay();
       updateElapsedDisplay();
     });
 
     socket.on("buzz-status-changed", ({ state, duration, startTime }) => {
       lockedBuzz = state === "locked";
-      buzzStartTime = state === "open" ? (startTime || 0) : 0;
-      buzzDuration_host = duration || 0; // Lưu duration
+      // SỬA LỖI: Chỉ cập nhật buzzStartTime khi trạng thái là "open"
+      if (state === "open") {
+          buzzStartTime = startTime || 0;
+      }
+      buzzDuration_host = duration || 0; 
       updateStatusDisplay();
       updateElapsedDisplay();
     });
@@ -686,9 +711,11 @@
       myRole = "Manager";
       myName = name;
       document.getElementById("roomInfo").innerHTML =
-        `🔑 <b>Mã phòng:</b> <span style="font-size:1.5em">${roomCode}</span> | <b>Vai trò:</b> <span class="role-manager">QUẢN LÝ</span>`;
+        `🔑 <b>Mã phòng:</b> <span style="font-size:1.5em">${roomCode}</span> | <b>Vai trò:</b> <span class="role-manager">QUẢN LÝ (${name})</span>`;
       answers = [];
       buzzOrder = [];
+      answerStartTime = 0; // Đồng bộ trạng thái khi Host/Manager join
+      buzzStartTime = 0; // Đồng bộ trạng thái khi Host/Manager join
       renderAnswers();
       renderBuzzList();
       updateStatusDisplay();
@@ -733,6 +760,7 @@
       managers.forEach(m => {
         const li = document.createElement("li");
         const isSelf = m.id === socket.id;
+        // Đã sửa: Loại bỏ ** và thay bằng <b>
         li.innerHTML = `${isSelf ? `(Bạn) ` : ''}<b>${m.name}</b> <span class="role-manager">(Quản lý)</span>`;
         ul.appendChild(li);
       });
