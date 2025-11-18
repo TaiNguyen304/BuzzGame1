@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kết Quả</title>
     <style>
-        /* CSS Vẫn Giữ Nguyên */
+        /* CSS Cơ Bản */
         body {
             background-color: white; 
             font-family: Arial, sans-serif;
@@ -15,33 +15,6 @@
             overflow: auto;
         }
 
-        #resultsTable {
-            width: 100%;
-            border-collapse: collapse; 
-        }
-
-        /* Thêm header cho bảng kết quả */
-        #resultsTable th {
-            background-color: #f0f0f0;
-            font-size: 1.1em;
-            padding: 8px 15px;
-            border: 1px solid #aaa;
-            text-align: left;
-        }
-
-        #resultsTable td {
-            font-weight: bold; 
-            font-size: 1.2em;
-            padding: 8px 15px; 
-            border: 1px solid #aaa; /* Thêm border để dễ nhìn */
-            text-align: left;
-            vertical-align: top;
-        }
-        
-        #resultsTable tr td:nth-child(1) { width: 30%; } 
-        #resultsTable tr td:nth-child(2) { width: 45%; } 
-        #resultsTable tr td:nth-child(3) { width: 25%; } 
-
         #inputContainer {
             margin-bottom: 20px;
             padding: 10px;
@@ -49,6 +22,13 @@
             border-radius: 5px;
             text-align: center;
             font-weight: bold;
+        }
+        
+        #resultsContainer {
+            border: 1px solid #ccc;
+            padding: 10px;
+            background: #fff;
+            box-shadow: 0 0 5px rgba(0,0,0,0.05);
         }
 
         #roomCodeInput {
@@ -108,23 +88,19 @@
         <span id="roomStatus" style="margin-left: 20px; color: blue;">Chưa tham gia phòng</span>
     </div>
     
-    <table id="resultsTable">
-        <thead>
-            
-        </thead>
-        <tbody>
-            
-        </tbody>
-    </table>
+    <div id="resultsContainer">
+        <p style="text-align:center; font-style:italic; font-weight: bold; font-size: 1em; color: black;"></p>
+    </div>
 
     <div id="messageBox"></div>
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
+        // NOTE: Hãy đảm bảo SOCKET_SERVER_URL khớp với địa chỉ máy chủ của bạn.
         const SOCKET_SERVER_URL = "https://buzzgame1-1.onrender.com"; 
         const socket = io(SOCKET_SERVER_URL, { autoConnect: true });
         
-        const resultsTableBody = document.querySelector('#resultsTable tbody');
+        const resultsContainer = document.getElementById('resultsContainer');
         const roomCodeInput = document.getElementById('roomCodeInput');
         const joinButton = document.getElementById('joinButton');
         const messageBox = document.getElementById('messageBox');
@@ -141,29 +117,36 @@
             }, 3000);
         }
 
+        // HÀM HIỂN THỊ KẾT QUẢ DƯỚI DẠNG CHUỖI TEXT
         function renderResults(data) {
-            resultsTableBody.innerHTML = ''; 
+            resultsContainer.innerHTML = ''; // Xóa kết quả cũ
 
             if (data.length === 0) {
-                resultsTableBody.innerHTML = '<tr><td colspan="3" style="text-align:center; font-style:italic; font-weight: normal; font-size: 1em; border: none;">Chưa có đáp án nào được gửi.</td></tr>';
+                resultsContainer.innerHTML = '<p style="text-align:center; font-style:italic; font-weight: bold; font-size: 1em; color: #555;">Chưa có đáp án nào được gửi.</p>';
                 return;
             }
 
             // Dữ liệu đã được sắp xếp từ server
             data.forEach(item => {
-                const row = resultsTableBody.insertRow();
-                
-                let cellName = row.insertCell();
-                cellName.textContent = item.name;
-
-                let cellAnswer = row.insertCell();
-                cellAnswer.textContent = item.answer;
-                
-                let cellTime = row.insertCell();
-                // Định dạng thời gian
                 const totalSeconds = Math.floor(item.time);
+                // Lấy 3 chữ số thập phân (milliseconds)
                 const milliseconds = Math.round((item.time % 1) * 1000); 
-                cellTime.textContent = `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
+                const formattedTime = `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
+                
+                // Tạo chuỗi Text theo định dạng yêu cầu: "Tên người chơi" | "Đáp án" | "Thời gian"
+                const resultText = `<b>${item.name}</b> | ${item.answer} | <i>${formattedTime}</i>`;
+                
+                // Tạo một dòng mới (thẻ p) để chứa kết quả
+                const p = document.createElement('p');
+                p.innerHTML = resultText;
+                p.style.fontSize = '1.2em';
+                p.style.fontWeight = 'normal';
+                p.style.borderBottom = '1px dashed #eee'; // Thêm đường gạch ngang nhẹ
+                p.style.padding = '8px 0';
+                p.style.margin = '0';
+                p.style.textAlign = 'left';
+                
+                resultsContainer.appendChild(p);
             });
         }
         
@@ -200,9 +183,8 @@
              console.log("Results updated from server.");
         });
 
-        // Sự kiện khi đáp án bị reset (server sẽ gửi update-results rỗng, nhưng dùng event riêng thì rõ ràng hơn)
+        // Sự kiện khi đáp án bị reset
         socket.on("answers-reset", () => {
-            // Tạm thời hiển thị tin nhắn reset, sau đó renderResults rỗng sẽ xóa bảng
             showMessage("Đáp án đã được Host/Manager reset!", true); 
         });
 
@@ -226,8 +208,8 @@
         });
 
         window.onload = () => {
+             // Tự động tham gia nếu đã có mã phòng trong input
              if (roomCodeInput.value.trim()) {
-                 // Tự động tham gia nếu đã có mã phòng trong input
                  joinButton.click();
              }
         };
