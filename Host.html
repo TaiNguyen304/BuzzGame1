@@ -488,12 +488,24 @@
 
     // Hàm cập nhật hiển thị danh sách chuông
     function renderBuzzList() {
-      buzzList.innerHTML = ""; // Xóa nội dung cũ
-      buzzOrder.sort((a, b) => a.ts - b.ts); // Sắp xếp theo thời gian bấm
+      buzzList.innerHTML = ""; 
+      buzzOrder.sort((a, b) => a.ts - b.ts); 
       buzzOrder.forEach((item, index) => {
-        const timeElapsed = formatTime(item.ts, buzzStartTime); // Sử dụng hàm formatTime
+        let elapsed = 0;
+        if (useLocalBuzzTime && item.localTimestamp) {
+             elapsed = item.localTimestamp - buzzStartTime;
+        } else {
+             elapsed = item.ts - buzzStartTime;
+        }
+
+        if (elapsed < 0) elapsed = 0;
+
+        const totalSeconds = Math.floor(elapsed / 1000);
+        const milliseconds = elapsed % 1000;
+        const timeString = `${totalSeconds}.${milliseconds.toString().padStart(3, '0')}s`;
+
         const li = document.createElement("li");
-        li.innerText = `${item.name} - ${timeElapsed}`;
+        li.innerText = `${item.name} - ${timeString}`;
         buzzList.appendChild(li);
       });
     }
@@ -767,6 +779,7 @@
       buzzDuration_host = duration || 0; // Lưu duration
       if (state === "open") {
         // Luôn lưu startTime GỐC của server (cho Excel)
+        useLocalBuzzTime = false;
         buzzStartTime = startTime || 0;
         if (buzzDuration_host > 0) {
           // Tính thời điểm kết thúc THEO ĐỒNG HỒ HOST
