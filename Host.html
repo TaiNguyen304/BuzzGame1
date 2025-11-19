@@ -689,6 +689,7 @@
     // ========== Đồng bộ hóa Reset Chuông ==========
     socket.on("buzz-reset", () => {
       buzzOrder = [];
+      buzzStartTime = Date.now();
       renderBuzzList();
       showPopup("Chuông đã được Host/Manager reset!");
     });
