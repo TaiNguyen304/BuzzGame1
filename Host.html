@@ -416,6 +416,7 @@
     // Biến lưu startTime GỐC từ server (Dùng cho tính toán Excel)
     let answerStartTime = 0;
     let buzzStartTime = 0;
+    let useLocalBuzzTime = false;
     // Biến lưu thông tin local để tính thời gian còn lại (để đồng bộ)
     let answerDuration_host = 0;
     let answerEndTime_host = 0;
@@ -674,6 +675,7 @@
 
     socket.on("host-new-buzz", data => {
       if (!buzzOrder.find(b => b.name === data.name)) {
+        data.localTimestamp = Date.now();
         buzzOrder.push(data);
       }
       renderBuzzList();
@@ -689,6 +691,7 @@
     // ========== Đồng bộ hóa Reset Chuông ==========
     socket.on("buzz-reset", () => {
       buzzOrder = [];
+      useLocalBuzzTime = true;
       buzzStartTime = Date.now();
       renderBuzzList();
       showPopup("Chuông đã được Host/Manager reset!");
