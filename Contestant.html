@@ -177,10 +177,10 @@ let buzzInterval = null;
 const btnSend = document.getElementById("btnSend");
 const btnBuzz = document.getElementById("btnBuzz");
 const answerTextArea = document.getElementById("answer");
-const roomCodeInput = document.getElementById("roomCode"); // Thêm biến cho input roomCode
-const nameInput = document.getElementById("name"); // Thêm biến cho input name
-const btnJoin = document.getElementById("btnJoin"); // Thêm biến cho nút Join
-const gameArea = document.getElementById("gameArea"); // Thêm biến cho gameArea
+const roomCodeInput = document.getElementById("roomCode");
+const nameInput = document.getElementById("name");
+const btnJoin = document.getElementById("btnJoin");
+const gameArea = document.getElementById("gameArea");
 const answerCountdown = document.getElementById("answerCountdown");
 const buzzCountdown = document.getElementById("buzzCountdown");
 
@@ -380,6 +380,22 @@ document.addEventListener('keydown', (e) => {
         handleBuzz();
     }
 });
+
+// BỔ SUNG: Xử lý khi Host/Manager Reset Chuông
+socket.on("buzz-reset", () => {
+    // Mở lại nút chuông của thí sinh sau khi Host/Manager Reset.
+    btnBuzz.classList.remove("locked");
+    btnBuzz.disabled = false;
+    // Báo cho thí sinh biết chuông đã được reset
+    showPopup("Chuông đã được Host/Manager reset!");
+});
+
+// BỔ SUNG: Xử lý khi Host/Manager Reset Đáp án
+socket.on("answers-reset", () => {
+    answerTextArea.value = ""; // Reset nội dung textbox đáp án về null/rỗng
+    showPopup("Đáp án đã được Host/Manager reset!");
+});
+
 </script>
 
 </body>
