@@ -10,6 +10,8 @@
       background: #eef;
       text-align: center;
       padding: 20px;
+      /* Ngăn chọn văn bản ở body để tránh click nhầm */
+      user-select: none; 
     }
 
     input,
@@ -18,6 +20,7 @@
       margin: 5px;
       font-size: 16px;
       font-weight: bold;
+      user-select: text; /* Cho phép chọn text trong ô nhập */
     }
 
     textarea {
@@ -29,12 +32,12 @@
       font-weight: bold;
     }
 
-    /* CLASS MỚI: Thay thế cho disabled để giữ con trỏ chuột */
+    /* CLASS MỚI: Style cho trạng thái khóa (dùng readOnly) */
     .textarea-locked {
       background-color: #333 !important;
       color: #fff !important;
       border: 2px solid #000;
-      caret-color: white; /* Con trỏ chuột màu trắng để nhìn thấy trên nền đen */
+      caret-color: transparent; /* Ẩn con trỏ chuột khi khóa */
       outline: none;
     }
 
@@ -51,6 +54,8 @@
       flex-direction: column;
       align-items: center;
       margin-top: 20px;
+      /* Click vào vùng này sẽ auto focus nếu đang mở */
+      min-height: 300px; 
     }
 
     #btnJoin {
@@ -96,7 +101,6 @@
       background: orange;
     }
 
-    /* CSS Khóa nút: Màu đen, chữ đậm trắng */
     #btnBuzz.locked,
     #btnSend.locked {
       background: black !important;
@@ -154,7 +158,7 @@
   <input id="name" placeholder="Tên của bạn">
   <button id="btnJoin">Xác nhận</button>
 
-  <div id="gameArea">
+  <div id="gameArea" onclick="forceFocusIfOpen()">
     <div id="answerTimerInfo" class="timer-info">
       Thời gian gửi đáp án còn lại: <span id="answerCountdown" class="timer-countdown">--.--s</span>
     </div>
@@ -195,12 +199,11 @@
     const answerCountdown = document.getElementById("answerCountdown");
     const buzzCountdown = document.getElementById("buzzCountdown");
 
-    // KHỞI TẠO TRẠNG THÁI BAN ĐẦU
     function initLockedState() {
       btnSend.classList.add("locked");
       btnSend.disabled = true;
       
-      // Thay vì disabled = true, ta dùng readOnly = true và add class
+      // Dùng readOnly và style riêng
       answerTextArea.readOnly = true;
       answerTextArea.classList.add("textarea-locked");
       
@@ -225,31 +228,54 @@
       return (Math.max(0, ms) / 1000).toFixed(3) + "s";
     }
 
-    // === LOGIC QUAN TRỌNG: XỬ LÝ UI VÀ FOCUS ===
+    // === HÀM FOCUS MẠNH MẼ ===
+    function forceFocusIfOpen() {
+        if (!lockedAnswer) {
+            answerTextArea.focus();
+        }
+    }
+
     function updateAnswerUI(isLocked) {
       lockedAnswer = isLocked;
       if (isLocked) {
-        // KHÓA
         btnSend.classList.add("locked");
         btnSend.disabled = true;
         
-        // Chuyển sang chế độ readOnly, thêm style đen
         answerTextArea.readOnly = true;
         answerTextArea.classList.add("textarea-locked");
+        answerTextArea.blur(); // Bỏ focus khi khóa
       } else {
-        // MỞ
         btnSend.classList.remove("locked");
         btnSend.disabled = false;
         
-        // Bỏ readOnly, bỏ style đen
         answerTextArea.readOnly = false;
         answerTextArea.classList.remove("textarea-locked");
+        
+        // Focus ngay lập tức
+        answerTextArea.focus();
       }
-      
-      // QUAN TRỌNG: Luôn luôn Focus dù khóa hay mở
-      // Để con trỏ chuột luôn nhấp nháy
-      answerTextArea.focus();
     }
+
+    // === SỰ KIỆN BẮT DÍNH BÀN PHÍM TOÀN TRANG (QUAN TRỌNG NHẤT) ===
+    document.addEventListener('keydown', (e) => {
+        // Nếu đang MỞ khóa đáp án
+        if (!lockedAnswer) {
+            // Và người dùng KHÔNG đang gõ trong ô nhập (ví dụ vừa click ra ngoài)
+            if (document.activeElement !== answerTextArea) {
+                // Focus lại ngay lập tức để nhận phím
+                answerTextArea.focus();
+            }
+        }
+    });
+    
+    // Bắt sự kiện click vào body để focus lại nếu lỡ click ra ngoài
+    document.body.addEventListener('click', (e) => {
+        // Trừ khi click vào nút (để tránh loop click nút)
+        if(e.target.tagName !== 'BUTTON' && !lockedAnswer) {
+            answerTextArea.focus();
+        }
+    });
+
 
     function startAnswerCountdown(startTime, duration) {
       if (answerInterval) clearInterval(answerInterval);
@@ -378,20 +404,19 @@
       });
       showPopup("Đã gửi!");
       answerTextArea.value = "";
-      // Sau khi gửi xong, vẫn giữ focus
+      // Focus lại sau khi gửi
       answerTextArea.focus();
     }
 
     btnSend.onclick = sendAnswer;
 
     answerTextArea.addEventListener('keydown', (e) => {
-      // Chặn Enter xuống dòng
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         sendAnswer();
       }
     });
-    
+
     function handleBuzz() {
       if (lockedBuzz) return showPopup("Chuông đang khóa!", "error");
       if (btnBuzz.disabled) return;
@@ -405,9 +430,11 @@
     btnBuzz.onclick = handleBuzz;
 
     document.addEventListener('keydown', (e) => {
+      // Phím tắt bấm chuông (Ctrl)
       if (e.key === 'Control') {
         e.preventDefault();
         handleBuzz();
+        return;
       }
     });
 
@@ -430,5 +457,4 @@
 
   </script>
 </body>
-
 </html>
