@@ -35,23 +35,21 @@
       background: #fff;
     }
 
-    
     th {
       background: yellow;
       color: black;
       font-weight: bold;
     }
 
-    
-    #tblAnswers td, #tblBuzz td {
+    #tblAnswers td,
+    #tblBuzz td {
       font-weight: bold;
       color: black;
       background: #fff;
     }
-    
-    
+
     #tblBuzz {
-        width: 600px;
+      width: 600px;
     }
 
     #roomInfo {
@@ -69,7 +67,6 @@
       transition: all 0.25s ease;
     }
 
-    /* Thêm style cho 3 nút trên cùng */
     .top-buttons-group button {
       height: 40px;
       padding: 0 15px;
@@ -93,6 +90,12 @@
     #btnExportResults {
       background: green;
       color: white;
+    }
+
+    /* Nút Bổ sung mới */
+    #btnManualAdd {
+      background: red;
+      color: white;
       font-weight: bold;
     }
 
@@ -100,28 +103,24 @@
     #unlockBuzzLimited {
       background: purple;
       color: white;
-      font-weight: bold;
     }
 
     #unlockAnswersPermanent,
     #unlockBuzzPermanent {
       background: blue;
       color: white;
-      font-weight: bold;
     }
 
     #lockAnswers,
     #lockBuzz {
       background: green;
       color: white;
-      font-weight: bold;
     }
 
     #resetAnswers,
     #resetBuzz {
       background: yellow;
       color: black;
-      font-weight: bold;
     }
 
     button:hover {
@@ -169,7 +168,6 @@
     .error {
       background-color: red;
       color: white;
-      font-weight: bold;
     }
 
     .control-group {
@@ -190,14 +188,6 @@
       margin-right: 10px;
     }
 
-    .time-elapsed-display {
-      font-size: 1.1em;
-      font-weight: bold;
-      margin-top: 10px;
-      height: 25px;
-    }
-
-    
     .popup-overlay {
       position: fixed;
       top: 0;
@@ -217,36 +207,40 @@
       border-radius: 8px;
       box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
       width: 90%;
-      max-width: 400px;
+      max-width: 600px;
       text-align: center;
+      max-height: 80vh;
+      overflow-y: auto;
     }
 
     .popup-content h3 {
       margin-top: 0;
     }
 
-    .popup-inputs input {
-      display: block;
-      margin: 10px auto;
-      width: 80%;
-      max-width: 300px;
+    /* Style cho Popup Bổ sung (chữ đậm đen) */
+    .add-popup-input {
+      font-weight: bold;
+      color: black;
     }
 
-    .popup-buttons {
-      margin-top: 20px;
+    .add-row {
       display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-bottom: 5px;
       justify-content: center;
-      gap: 10px;
     }
 
-    #btnConfirmManager {
-      background: green;
-      color: white;
+    .add-row input {
+      width: 120px;
+      font-weight: bold;
+      color: black;
     }
 
-    #btnCloseJoin {
-      background: red;
-      color: white;
+    #addRowsContainer {
+      margin-top: 10px;
+      border-top: 1px solid #ccc;
+      padding-top: 10px;
     }
 
     #userListContainer {
@@ -294,7 +288,7 @@
     <button id="btnCreate">Tạo phòng</button>
     <button id="btnJoinManager">Tham gia phòng (Quản lý)</button>
     <button id="btnListUsers">Danh sách tham gia</button>
-    <button id="btnExportResults">Xuất kết quả</button>
+    <button id="btnManualAdd">Bổ sung</button> <button id="btnExportResults">Xuất kết quả</button>
   </div>
   <br><br>
 
@@ -345,8 +339,7 @@
         <th style="width: 20%;">Thời gian</th>
       </tr>
     </thead>
-    <tbody>
-      </tbody>
+    <tbody></tbody>
   </table>
 
   <h2>Thứ tự bấm chuông:</h2>
@@ -357,8 +350,7 @@
         <th style="width: 30%;">Thời gian</th>
       </tr>
     </thead>
-    <tbody>
-    </tbody>
+    <tbody></tbody>
   </table>
 
   <div id="popupMessage"></div>
@@ -371,8 +363,8 @@
         <input type="text" id="managerName" placeholder="Tên quản lý">
       </div>
       <div class="popup-buttons">
-        <button id="btnConfirmManager">Xác nhận</button>
-        <button id="btnCloseJoin">Đóng</button>
+        <button id="btnConfirmManager" style="background:green; color:white;">Xác nhận</button>
+        <button id="btnCloseJoin" style="background:red; color:white;">Đóng</button>
       </div>
     </div>
   </div>
@@ -389,6 +381,33 @@
     </div>
   </div>
 
+  <div id="addPopup" class="popup-overlay">
+    <div class="popup-content" style="max-width: 700px;">
+      <h3 style="font-weight: bold;">Bổ sung dữ liệu</h3>
+
+      <div style="font-weight: bold; color: black; margin-bottom: 10px;">
+        <label><input type="radio" name="addType" value="answer" checked onchange="toggleAddType()"> Đáp án</label>
+        <label style="margin-left: 20px;"><input type="radio" name="addType" value="buzz" onchange="toggleAddType()">
+          Chuông</label>
+      </div>
+
+      <div class="control-item" style="justify-content: center;">
+        <label style="color:black;">Số thí sinh:</label>
+        <input type="number" id="numAddRows" value="1" min="1" max="20"
+          style="width: 60px; font-weight: bold; color: black;">
+        <button onclick="generateAddRows()" style="background: purple; color: white; margin-left: 10px;">Tạo ô</button>
+      </div>
+
+      <div id="addRowsContainer">
+      </div>
+
+      <div class="popup-buttons" style="margin-top: 20px;">
+        <button id="btnConfirmAdd" style="background: green; color: white; font-weight: bold;">Xác nhận</button>
+        <button id="btnCloseAdd" style="background: red; color: white; font-weight: bold;">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
   <script>
@@ -397,16 +416,17 @@
 
     let currentRoom = null;
     let myName = "Host";
-    let myRole = "Host";
     let answers = [];
     let buzzOrder = [];
+    let allContestants = []; // Lưu danh sách thí sinh để validate
+
     let lockedAnswer = true;
     let lockedBuzz = true;
-    
+
     let answerStartTime = 0;
     let buzzStartTime = 0;
     let useLocalBuzzTime = false;
-    
+
     let answerDuration_host = 0;
     let answerEndTime_host = 0;
     let buzzDuration_host = 0;
@@ -415,28 +435,17 @@
     const answerDurationInput = document.getElementById("answerDuration");
     const buzzDurationInput = document.getElementById("buzzDuration");
     const tblAnswersBody = document.querySelector("#tblAnswers tbody");
-    // === THAY ĐỔI: Lấy tbody của bảng Buzz thay vì list ===
     const tblBuzzBody = document.querySelector("#tblBuzz tbody");
     const roomInfo = document.getElementById("roomInfo");
-
-    // ===========================================
-    // ========== CÁC HÀM TIỆN ÍCH ================
-    // ===========================================
 
     function showPopup(message, type = "success") {
       const popup = document.getElementById("popupMessage");
       popup.innerText = message;
       popup.classList.remove("error");
-      if (type === "error") {
-        popup.classList.add("error");
-      }
+      if (type === "error") popup.classList.add("error");
       popup.style.top = "20px";
       popup.style.opacity = 1;
-
-      setTimeout(() => {
-        popup.style.opacity = 0;
-        popup.style.top = "-50px";
-      }, 3000);
+      setTimeout(() => { popup.style.opacity = 0; popup.style.top = "-50px"; }, 3000);
     }
 
     function format(ms) {
@@ -447,51 +456,36 @@
     }
 
     function formatTime(ts, startTime) {
-        if (startTime === 0) return "0.000s";
-        
-        const elapsed = ts - startTime;
-        if (elapsed < 0) return "0.000s (Lỗi)";
-        
-        const totalSeconds = Math.floor(elapsed / 1000);
-        const milliseconds = elapsed % 1000;
-        
-        return `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
+      if (startTime === 0) return "0.000s";
+      const elapsed = ts - startTime;
+      if (elapsed < 0) return "0.000s"; // Tránh hiện số âm nếu chỉnh sửa thủ công time nhỏ hơn
+      const totalSeconds = Math.floor(elapsed / 1000);
+      const milliseconds = elapsed % 1000;
+      return `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
     }
 
     function renderAnswers() {
       tblAnswersBody.innerHTML = "";
       answers.sort((a, b) => a.ts - b.ts);
-      answers.forEach((item, index) => {
+      answers.forEach(item => {
         const row = tblAnswersBody.insertRow();
-        const timeElapsed = formatTime(item.ts, answerStartTime);
         row.insertCell().innerText = item.name;
         row.insertCell().innerText = item.answer;
-        row.insertCell().innerText = timeElapsed;
+        row.insertCell().innerText = formatTime(item.ts, answerStartTime);
       });
     }
 
-    // === THAY ĐỔI: Hàm renderBuzzList render ra bảng ===
     function renderBuzzList() {
-      tblBuzzBody.innerHTML = ""; // Xóa nội dung bảng cũ
-      buzzOrder.sort((a, b) => a.ts - b.ts); 
-      buzzOrder.forEach((item, index) => {
-        let elapsed = 0;
-        if (useLocalBuzzTime && item.localTimestamp) {
-             elapsed = item.localTimestamp - buzzStartTime;
-        } else {
-             elapsed = item.ts - buzzStartTime;
-        }
-
+      tblBuzzBody.innerHTML = "";
+      buzzOrder.sort((a, b) => a.ts - b.ts);
+      buzzOrder.forEach(item => {
+        let elapsed = (useLocalBuzzTime && item.localTimestamp) ? (item.localTimestamp - buzzStartTime) : (item.ts - buzzStartTime);
         if (elapsed < 0) elapsed = 0;
-
-        const totalSeconds = Math.floor(elapsed / 1000);
-        const milliseconds = elapsed % 1000;
-        const timeString = `${totalSeconds}.${milliseconds.toString().padStart(3, '0')}s`;
-
-        // Tạo dòng mới trong bảng Buzz
+        const sec = Math.floor(elapsed / 1000);
+        const ms = elapsed % 1000;
         const row = tblBuzzBody.insertRow();
         row.insertCell().innerText = item.name;
-        row.insertCell().innerText = timeString;
+        row.insertCell().innerText = `${sec}.${ms.toString().padStart(3, '0')}s`;
       });
     }
 
@@ -509,45 +503,34 @@
       const aDisp = document.getElementById("answerTimeElapsed");
       const bDisp = document.getElementById("buzzTimeElapsed");
 
-      if (!lockedAnswer && answerDuration_host === 0) {
-        aDisp.innerHTML = "";
-      } else if (!lockedAnswer && answerDuration_host > 0 && answerEndTime_host > 0) {
+      if (!lockedAnswer && answerDuration_host > 0 && answerEndTime_host > 0) {
         const remain = answerEndTime_host - now;
         aDisp.innerHTML = `Thời gian gửi đáp án còn lại: <span style="color:red;">${format(remain)}</span>`;
-      } else {
-        aDisp.innerHTML = "";
-      }
+      } else { aDisp.innerHTML = ""; }
 
-      if (!lockedBuzz && buzzDuration_host === 0) {
-        bDisp.innerHTML = "";
-      } else if (!lockedBuzz && buzzDuration_host > 0 && buzzEndTime_host > 0) {
+      if (!lockedBuzz && buzzDuration_host > 0 && buzzEndTime_host > 0) {
         const remain = buzzEndTime_host - now;
         bDisp.innerHTML = `Thời gian bấm chuông còn lại: <span style="color:red;">${format(remain)}</span>`;
-      } else {
-        bDisp.innerHTML = "";
-      }
+      } else { bDisp.innerHTML = ""; }
     }
-
     setInterval(updateElapsedDisplay, 100);
 
     function renderUserList(host, managers, contestants) {
+      // Lưu lại danh sách contestant để dùng cho Validate ở Popup Bổ sung
+      allContestants = contestants.map(c => c.name);
+
       const ul = document.querySelector("#userListContainer ul");
       ul.innerHTML = "";
-
       if (host) {
         const li = document.createElement("li");
-        const isSelf = host.id === socket.id;
-        li.innerHTML = `${isSelf ? `(Bạn) ` : ''}<b>${host.name}</b> <span class="role-host">(Host)</span>`;
+        li.innerHTML = `${host.id === socket.id ? '(Bạn) ' : ''}<b>${host.name}</b> <span class="role-host">(Host)</span>`;
         ul.appendChild(li);
       }
-
       managers.forEach(m => {
         const li = document.createElement("li");
-        const isSelf = m.id === socket.id;
-        li.innerHTML = `${isSelf ? `(Bạn) ` : ''}<b>${m.name}</b> <span class="role-manager">(Quản lý)</span>`;
+        li.innerHTML = `${m.id === socket.id ? '(Bạn) ' : ''}<b>${m.name}</b> <span class="role-manager">(Quản lý)</span>`;
         ul.appendChild(li);
       });
-
       contestants.forEach(c => {
         const li = document.createElement("li");
         li.innerHTML = `<b>${c.name}</b> <span class="role-contestant">(Thí sinh)</span>`;
@@ -555,59 +538,151 @@
       });
     }
 
-    document.getElementById("btnExportResults").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
-      if (typeof XLSX === 'undefined') return showPopup("Lỗi: Không thể tải thư viện Excel (XLSX).", "error");
+    // ================= XỬ LÝ POPUP BỔ SUNG =================
+    const btnManualAdd = document.getElementById("btnManualAdd");
+    const addPopup = document.getElementById("addPopup");
+    const addRowsContainer = document.getElementById("addRowsContainer");
 
-      const ws1_data = [
-        ["Tên người chơi", "Đáp án", "Thời gian"]
-      ];
-      answers.forEach(x => {
-        ws1_data.push([
-          x.name,
-          x.answer,
-          formatTime(x.ts, answerStartTime).replace('s', '')
-        ]);
-      });
-
-      const ws2_data = [
-        ["Tên người chơi", "Thời gian bấm chuông"]
-      ];
-      buzzOrder.forEach(x => {
-        ws2_data.push([
-          x.name,
-          formatTime(x.ts, buzzStartTime).replace('s', '')
-        ]);
-      });
-
-      const wb = XLSX.utils.book_new();
-
-      const ws1 = XLSX.utils.aoa_to_sheet(ws1_data);
-      XLSX.utils.book_append_sheet(wb, ws1, "KetQua_DapAn");
-
-      const ws2 = XLSX.utils.aoa_to_sheet(ws2_data);
-      XLSX.utils.book_append_sheet(wb, ws2, "KetQua_Buzz");
-
-      const filename = `KetQua_Phong_${currentRoom}_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
-      XLSX.writeFile(wb, filename);
-      showPopup("Đã xuất kết quả ra file Excel!");
+    btnManualAdd.onclick = () => {
+      if (!currentRoom) return showPopup("Chưa có phòng!", "error");
+      // Lấy danh sách user mới nhất để validate
+      socket.emit("host-get-users", currentRoom);
+      addPopup.style.display = "flex";
+      toggleAddType(); // Reset UI
     };
 
+    document.getElementById("btnCloseAdd").onclick = () => {
+      addPopup.style.display = "none";
+      addRowsContainer.innerHTML = "";
+    };
 
-    // ===========================================
-    // ============ SOCKET.IO LOGIC ==============
-    // ===========================================
+    function toggleAddType() {
+      addRowsContainer.innerHTML = ""; // Clear cũ
+      document.getElementById("numAddRows").value = 1;
+    }
 
-    socket.on("connect", () => {
-      console.log("Connected to server. ID:", socket.id);
-      if (currentRoom) {
+    window.generateAddRows = function () {
+      const type = document.querySelector('input[name="addType"]:checked').value;
+      const num = parseInt(document.getElementById("numAddRows").value) || 1;
+      addRowsContainer.innerHTML = "";
+
+      for (let i = 0; i < num; i++) {
+        const div = document.createElement("div");
+        div.className = "add-row";
+
+        // Ô tên
+        div.innerHTML += `<input type="text" placeholder="Tên" class="add-input-name">`;
+
+        // Nếu là Answer thì thêm ô đáp án
+        if (type === "answer") {
+          div.innerHTML += `<input type="text" placeholder="Đáp án" class="add-input-ans">`;
+        }
+
+        // Ô thời gian
+        div.innerHTML += `<input type="number" placeholder="Giây (vd: 5.2)" step="0.1" class="add-input-time">`;
+
+        // Checkbox giới hạn
+        div.innerHTML += `<label style="font-weight:bold; color:black; font-size:14px;">
+                <input type="checkbox" class="add-check-limit"> GH Time?
+            </label>`;
+
+        addRowsContainer.appendChild(div);
       }
-    });
+    }
+
+    document.getElementById("btnConfirmAdd").onclick = () => {
+      const type = document.querySelector('input[name="addType"]:checked').value;
+      const rows = document.querySelectorAll(".add-row");
+      const dataToSend = [];
+      let hasError = false;
+
+      // Lấy giá trị giới hạn từ màn hình chính
+      const limitAnswerVal = parseFloat(answerDurationInput.value) || 0;
+      const limitBuzzVal = parseFloat(buzzDurationInput.value) || 0;
+
+      rows.forEach((row, idx) => {
+        if (hasError) return;
+
+        const name = row.querySelector(".add-input-name").value.trim();
+        const timeVal = parseFloat(row.querySelector(".add-input-time").value);
+        const checkLimit = row.querySelector(".add-check-limit").checked;
+
+        if (!name) {
+          showPopup(`Hàng ${idx + 1}: Chưa nhập tên`, "error");
+          hasError = true; return;
+        }
+
+        // Validate Tên tồn tại
+        if (!allContestants.includes(name)) {
+          showPopup(`Hàng ${idx + 1}: Tên "${name}" không có trong phòng!`, "error");
+          hasError = true; return;
+        }
+
+        if (isNaN(timeVal) || timeVal < 0) {
+          showPopup(`Hàng ${idx + 1}: Thời gian không hợp lệ`, "error");
+          hasError = true; return;
+        }
+
+        // Validate Thời gian giới hạn
+        if (checkLimit) {
+          if (type === "answer") {
+            if (limitAnswerVal > 0 && timeVal > limitAnswerVal) {
+              showPopup(`Hàng ${idx + 1}: Thời gian (${timeVal}s) lớn hơn giới hạn đáp án (${limitAnswerVal}s)`, "error");
+              hasError = true; return;
+            }
+          } else { // Buzz
+            if (limitBuzzVal > 0 && timeVal > limitBuzzVal) {
+              showPopup(`Hàng ${idx + 1}: Thời gian (${timeVal}s) lớn hơn giới hạn chuông (${limitBuzzVal}s)`, "error");
+              hasError = true; return;
+            }
+          }
+        }
+
+        if (type === "answer") {
+          const ans = row.querySelector(".add-input-ans").value.trim();
+          if (!ans) {
+            showPopup(`Hàng ${idx + 1}: Chưa nhập đáp án`, "error");
+            hasError = true; return;
+          }
+          dataToSend.push({ name, answer: ans, time: timeVal });
+        } else {
+          // Validate Buzz: Check đã buzz chưa
+          const alreadyBuzz = buzzOrder.some(b => b.name === name);
+          // Lưu ý: check với list hiện tại (buzzOrder).
+          // Tuy nhiên nếu nhập nhiều dòng trùng tên nhau trong popup thì sao?
+          // Check trong dataToSend nữa.
+          const duplicateInPopup = dataToSend.some(d => d.name === name);
+
+          if (alreadyBuzz || duplicateInPopup) {
+            showPopup(`Hàng ${idx + 1}: Tên "${name}" đã bấm chuông hoặc bị trùng!`, "error");
+            hasError = true; return;
+          }
+          dataToSend.push({ name, time: timeVal });
+        }
+      });
+
+      if (hasError) return;
+      if (dataToSend.length === 0) return showPopup("Chưa có dữ liệu nào!", "error");
+
+      // Gửi lên server
+      socket.emit("host-force-add", {
+        roomCode: currentRoom,
+        type: type,
+        data: dataToSend
+      });
+
+      showPopup("Đã bổ sung dữ liệu thành công!");
+      addPopup.style.display = "none";
+      addRowsContainer.innerHTML = "";
+    };
+
+    // =======================================================
+
+    socket.on("connect", () => { });
 
     socket.on("room-created", (data) => {
       currentRoom = data.roomCode;
       myName = "Host";
-      myRole = "Host";
       roomInfo.innerText = `Phòng: ${currentRoom} | Vai trò: Host`;
       answers = data.answers || [];
       buzzOrder = data.buzzOrder || [];
@@ -619,19 +694,16 @@
     socket.on("manager-join-success", (data) => {
       currentRoom = data.roomCode;
       myName = data.name;
-      myRole = "Manager";
       roomInfo.innerText = `Phòng: ${currentRoom} | Vai trò: Quản lý (${myName})`;
       answers = data.answers || [];
       buzzOrder = data.buzzOrder || [];
       renderAnswers();
       renderBuzzList();
       document.getElementById("joinPopup").style.display = "none";
-      showPopup(`Tham gia phòng ${currentRoom} thành công với vai trò Quản lý!`);
+      showPopup(`Tham gia thành công!`);
     });
 
-    socket.on("join-error", (message) => {
-      showPopup(message, "error");
-    });
+    socket.on("join-error", (message) => showPopup(message, "error"));
 
     socket.on("host-new-answer", data => {
       const idx = answers.findIndex(x => x.name === data.name);
@@ -651,7 +723,7 @@
     socket.on("answers-reset", () => {
       answers = [];
       renderAnswers();
-      showPopup("Đáp án đã được Host/Manager reset!");
+      showPopup("Reset đáp án thành công!");
     });
 
     socket.on("buzz-reset", () => {
@@ -659,48 +731,42 @@
       useLocalBuzzTime = true;
       buzzStartTime = Date.now();
       renderBuzzList();
-      showPopup("Chuông đã được Host/Manager reset!");
+      showPopup("Reset chuông thành công!");
     });
 
     document.getElementById("unlockAnswersLimited").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
+      if (!currentRoom) return;
       const duration = Math.max(1, parseInt(answerDurationInput.value) || 0);
       socket.emit("host-toggle-answer", { roomCode: currentRoom, state: "open", duration });
     };
-
     document.getElementById("unlockAnswersPermanent").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
+      if (!currentRoom) return;
       socket.emit("host-toggle-answer", { roomCode: currentRoom, state: "open", duration: 0 });
     };
-
     document.getElementById("lockAnswers").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
+      if (!currentRoom) return;
       socket.emit("host-toggle-answer", { roomCode: currentRoom, state: "locked" });
     };
-
     document.getElementById("resetAnswers").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
+      if (!currentRoom) return;
       socket.emit("host-reset-answers", currentRoom);
     };
 
     document.getElementById("unlockBuzzLimited").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
+      if (!currentRoom) return;
       const duration = Math.max(1, parseInt(buzzDurationInput.value) || 0);
       socket.emit("host-toggle-buzz", { roomCode: currentRoom, state: "open", duration });
     };
-
     document.getElementById("unlockBuzzPermanent").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
+      if (!currentRoom) return;
       socket.emit("host-toggle-buzz", { roomCode: currentRoom, state: "open", duration: 0 });
     };
-
     document.getElementById("lockBuzz").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
+      if (!currentRoom) return;
       socket.emit("host-toggle-buzz", { roomCode: currentRoom, state: "locked" });
     };
-
     document.getElementById("resetBuzz").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
+      if (!currentRoom) return;
       socket.emit("host-reset-buzz", currentRoom);
     };
 
@@ -709,14 +775,9 @@
       answerDuration_host = duration || 0;
       if (state === "open") {
         answerStartTime = startTime || 0;
-        if (answerDuration_host > 0) {
-          answerEndTime_host = Date.now() + (answerDuration_host * 1000);
-        } else {
-          answerEndTime_host = 0;
-        }
+        answerEndTime_host = (answerDuration_host > 0) ? Date.now() + (answerDuration_host * 1000) : 0;
       }
       updateStatusDisplay();
-      showPopup(`Đáp án: ${lockedAnswer ? 'Đã Khóa' : 'Đã Mở'}`);
     });
 
     socket.on("buzz-status-changed", ({ state, duration, startTime }) => {
@@ -725,54 +786,35 @@
       if (state === "open") {
         useLocalBuzzTime = false;
         buzzStartTime = startTime || 0;
-        if (buzzDuration_host > 0) {
-          buzzEndTime_host = Date.now() + (buzzDuration_host * 1000);
-        } else {
-          buzzEndTime_host = 0;
-        }
+        buzzEndTime_host = (buzzDuration_host > 0) ? Date.now() + (buzzDuration_host * 1000) : 0;
       }
       updateStatusDisplay();
-      showPopup(`Chuông: ${lockedBuzz ? 'Đã Khóa' : 'Đã Mở'}`);
     });
 
     document.getElementById("btnCreate").onclick = () => {
       const roomCode = Math.floor(100000 + Math.random() * 900000);
       socket.emit("host-create-room", roomCode);
     };
-
     document.getElementById("btnJoinManager").onclick = () => {
       document.getElementById("joinPopup").style.display = "flex";
       document.getElementById("managerRoomCode").value = currentRoom || "";
-      document.getElementById("managerName").value = myName === "Host" ? "" : myName;
     };
-
-    document.getElementById("btnCloseJoin").onclick = () => {
-      document.getElementById("joinPopup").style.display = "none";
-    };
+    document.getElementById("btnCloseJoin").onclick = () => document.getElementById("joinPopup").style.display = "none";
 
     document.getElementById("btnConfirmManager").onclick = () => {
       const code = document.getElementById("managerRoomCode").value.trim();
       const name = document.getElementById("managerName").value.trim();
-
-      if (code.length !== 6 || isNaN(code)) {
-        return showPopup("Mã phòng phải là 6 chữ số!", "error");
-      }
-      if (name.length < 1) {
-        return showPopup("Vui lòng nhập Tên quản lý!", "error");
-      }
-
+      if (code.length !== 6) return showPopup("Mã phòng sai", "error");
+      if (!name) return showPopup("Nhập tên quản lý", "error");
       socket.emit("manager-join-room", { roomCode: parseInt(code), name });
     };
 
     document.getElementById("btnListUsers").onclick = () => {
-      if (!currentRoom) return showPopup("Vui lòng tạo/tham gia phòng trước!", "error");
+      if (!currentRoom) return showPopup("Chưa vào phòng", "error");
       socket.emit("host-get-users", currentRoom);
       document.getElementById("listPopup").style.display = "flex";
     };
-
-    document.getElementById("btnCloseList").onclick = () => {
-      document.getElementById("listPopup").style.display = "none";
-    };
+    document.getElementById("btnCloseList").onclick = () => document.getElementById("listPopup").style.display = "none";
 
     socket.on("host-all-users", ({ host, managers, contestants }) => {
       renderUserList(host, managers, contestants);
@@ -780,17 +822,23 @@
 
     socket.on("host-new-user", (user) => {
       socket.emit("host-get-users", currentRoom);
-      showPopup(`[${user.role}] ${user.name} đã tham gia phòng.`);
+      showPopup(`[${user.role}] ${user.name} đã vào phòng.`);
     });
-
     socket.on("host-user-left", (user) => {
       socket.emit("host-get-users", currentRoom);
-      showPopup(`[${user.role}] đã rời phòng.`, 'error');
     });
 
-    document.getElementById("btnCreate").onclick = () => {
-      const roomCode = Math.floor(100000 + Math.random() * 900000);
-      socket.emit("host-create-room", roomCode);
+    document.getElementById("btnExportResults").onclick = () => {
+      if (!currentRoom || typeof XLSX === 'undefined') return;
+      const ws1_data = [["Tên", "Đáp án", "Thời gian"]];
+      answers.forEach(x => ws1_data.push([x.name, x.answer, formatTime(x.ts, answerStartTime).replace('s', '')]));
+      const ws2_data = [["Tên", "Thời gian chuông"]];
+      buzzOrder.forEach(x => ws2_data.push([x.name, formatTime(x.ts, buzzStartTime).replace('s', '')]));
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws1_data), "DapAn");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws2_data), "Chuong");
+      XLSX.writeFile(wb, `KQ_${currentRoom}.xlsx`);
     };
   </script>
 </body>
