@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Host Panel</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      text-align: center;
+      padding: 20px;
+    }
+
+    input,
+    button,
+    textarea {
+      padding: 10px;
+      margin: 5px;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    table,
+    th,
+    td {
+      border: 1px solid #aaa;
+      border-collapse: collapse;
+      padding: 8px;
+      margin: 10px auto;
+    }
+
+    table {
+      width: 90%;
+      background: #fff;
+    }
+
+    th {
+      background: yellow;
+      color: black;
+      font-weight: bold;
+    }
+
+    #tblAnswers td,
+    #tblBuzz td {
+      font-weight: bold;
+      color: black;
+      background: #fff;
+    }
+
+    #tblBuzz {
+      width: 600px;
+    }
+
+    #roomInfo {
+      font-size: 1.2em;
+      font-weight: bold;
+      margin-bottom: 15px;
+      color: #333;
+    }
+
+    button {
+      cursor: pointer;
+      border-radius: 6px;
+      border: none;
+      font-weight: bold;
+      transition: all 0.25s ease;
+    }
+
+    .top-buttons-group button {
+      height: 40px;
+      padding: 0 15px;
+    }
+
+    #btnCreate {
+      background: yellow;
+      color: black;
+    }
+
+    #btnJoinManager {
+      background: green;
+      color: white;
+    }
+
+    #btnListUsers {
+      background: blue;
+      color: white;
+    }
+
+    #btnExportResults {
+      background: purple;
+      color: white;
+    }
+
+    #btnManualAdd {
+      background: red;
+      color: white;
+      font-weight: bold;
+    }
+
+    #unlockAnswersLimited,
+    #unlockBuzzLimited {
+      background: purple;
+      color: white;
+    }
+
+    #unlockAnswersPermanent,
+    #unlockBuzzPermanent {
+      background: blue;
+      color: white;
+    }
+
+    #lockAnswers,
+    #lockBuzz {
+      background: green;
+      color: white;
+    }
+
+    #resetAnswers,
+    #resetBuzz {
+      background: yellow;
+      color: black;
+    }
+
+    button:hover {
+      background: #ff00cc !important;
+      color: white !important;
+    }
+
+    .status-box {
+      display: inline-block;
+      padding: 8px 15px;
+      border-radius: 6px;
+      margin: 5px;
+      min-width: 160px;
+      font-weight: bold;
+      font-size: 17px;
+    }
+
+    .open {
+      background: green;
+      color: white;
+      box-shadow: 0 0 10px green;
+    }
+
+    .locked {
+      background: red;
+      color: white;
+    }
+
+    #popupMessage {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: blue;
+      color: white;
+      padding: 15px 30px;
+      border-radius: 5px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.5s, top 0.5s;
+      font-weight: bold;
+    }
+
+    .error {
+      background-color: red;
+      color: white;
+    }
+
+    .control-group {
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .control-item {
+      display: flex;
+      align-items: center;
+    }
+
+    .control-item label {
+      font-weight: bold;
+      margin-right: 10px;
+    }
+
+    /* SỬA: Đảm bảo font-weight bold cho dòng đếm ngược */
+    .time-elapsed-display {
+      font-size: 1.2em;
+      font-weight: bold !important;
+      /* Bắt buộc đậm */
+      margin-top: 10px;
+      height: 25px;
+      color: black;
+    }
+
+    .popup-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1001;
+    }
+
+    .popup-content {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      width: 90%;
+      max-width: 600px;
+      text-align: center;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .popup-content h3 {
+      margin-top: 0;
+    }
+
+    .add-popup-input {
+      font-weight: bold;
+      color: black;
+    }
+
+    .add-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-bottom: 5px;
+      justify-content: center;
+    }
+
+    .add-row input {
+      width: 120px;
+      font-weight: bold;
+      color: black;
+    }
+
+    #addRowsContainer {
+      margin-top: 10px;
+      border-top: 1px solid #ccc;
+      padding-top: 10px;
+    }
+
+    #userListContainer {
+      max-height: 400px;
+      overflow-y: auto;
+      text-align: left;
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 15px;
+    }
+
+    #userListContainer ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    #userListContainer li {
+      padding: 5px 0;
+      border-bottom: 1px dotted #eee;
+    }
+
+    .role-host {
+      color: blue;
+      font-weight: bold;
+    }
+
+    .role-manager {
+      color: red;
+      font-weight: bold;
+    }
+
+    .role-contestant {
+      color: black;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Host Panel</h1>
+
+  <div id="roomInfo"></div>
+
+  <div class="top-buttons-group">
+    <button id="btnCreate">Tạo phòng</button>
+    <button id="btnJoinManager">Tham gia phòng (Quản lý)</button>
+    <button id="btnListUsers">Danh sách tham gia</button>
+    <button id="btnManualAdd">Bổ sung</button>
+    <button id="btnExportResults">Xuất kết quả</button>
+  </div>
+  <br><br>
+
+  <div>
+    <div class="status-box locked" id="statusAnswer">Đáp án: 🔒 Đang khóa</div>
+    <div class="status-box locked" id="statusBuzz">Chuông: 🚫 Đang khóa</div>
+  </div>
+
+  <div class="time-elapsed-display" id="answerTimeElapsed"></div>
+  <div class="time-elapsed-display" id="buzzTimeElapsed"></div>
+
+  <div class="control-group">
+    <div class="control-item">
+      <label for="answerDuration">Thời gian mở đáp án (giây):</label>
+      <input type="number" id="answerDuration" value="0" min="1" max="300" style="width: 80px; font-weight: bold;">
+    </div>
+    <div class="control-item">
+      <label for="buzzDuration">Thời gian mở chuông (giây):</label>
+      <input type="number" id="buzzDuration" value="0" min="1" max="300" style="width: 80px; font-weight: bold;">
+    </div>
+  </div>
+
+  <div style="margin-top: 5px;">
+    <div>
+      <button id="unlockAnswersLimited">Mở đáp án (Giới hạn)</button>
+      <button id="unlockAnswersPermanent">Mở đáp án (Vĩnh viễn)</button>
+      <button id="lockAnswers">Khóa đáp án</button>
+      <button id="resetAnswers">Reset đáp án</button>
+    </div>
+  </div>
+
+  <div style="margin-top: 5px;">
+    <div>
+      <button id="unlockBuzzLimited">Mở chuông (Giới hạn)</button>
+      <button id="unlockBuzzPermanent">Mở chuông (Vĩnh viễn)</button>
+      <button id="lockBuzz">Khóa chuông</button>
+      <button id="resetBuzz">Reset chuông</button>
+    </div>
+  </div>
+  <br>
+
+  <h2>Bảng kết quả đáp án:</h2>
+  <table id="tblAnswers">
+    <thead>
+      <tr>
+        <th style="width: 30%;">Tên</th>
+        <th style="width: 50%;">Đáp án</th>
+        <th style="width: 20%;">Thời gian</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <h2>Thứ tự bấm chuông:</h2>
+  <table id="tblBuzz">
+    <thead>
+      <tr>
+        <th style="width: 70%;">Tên</th>
+        <th style="width: 30%;">Thời gian</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div id="popupMessage"></div>
+
+  <div id="joinPopup" class="popup-overlay">
+    <div class="popup-content">
+      <h3>Tham gia phòng (Quản lý)</h3>
+      <div class="popup-inputs">
+        <input type="text" id="managerRoomCode" placeholder="Mã phòng (6 số)">
+        <input type="text" id="managerName" placeholder="Tên quản lý">
+      </div>
+      <div class="popup-buttons">
+        <button id="btnConfirmManager" style="background:green; color:white;">Xác nhận</button>
+        <button id="btnCloseJoin" style="background:red; color:white;">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="listPopup" class="popup-overlay">
+    <div class="popup-content">
+      <h3>Danh sách tham gia</h3>
+      <div id="userListContainer">
+        <ul></ul>
+      </div>
+      <div class="popup-buttons">
+        <button id="btnCloseList" style="background: red; color: white;">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="addPopup" class="popup-overlay">
+    <div class="popup-content" style="max-width: 700px;">
+      <h3 style="font-weight: bold;">Bổ sung dữ liệu</h3>
+
+      <div style="font-weight: bold; color: black; margin-bottom: 10px;">
+        <label><input type="radio" name="addType" value="answer" checked onchange="toggleAddType()"> Đáp án</label>
+        <label style="margin-left: 20px;"><input type="radio" name="addType" value="buzz" onchange="toggleAddType()">
+          Chuông</label>
+      </div>
+
+      <div class="control-item" style="justify-content: center;">
+        <label style="color:black;">Số thí sinh:</label>
+        <input type="number" id="numAddRows" value="1" min="1" max="20"
+          style="width: 60px; font-weight: bold; color: black;">
+        <button onclick="generateAddRows()" style="background: purple; color: white; margin-left: 10px;">Tạo ô</button>
+      </div>
+
+      <div id="addRowsContainer"></div>
+
+      <div class="popup-buttons" style="margin-top: 20px;">
+        <button id="btnConfirmAdd" style="background: green; color: white; font-weight: bold;">Xác nhận</button>
+        <button id="btnCloseAdd" style="background: red; color: white; font-weight: bold;">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+  <script>
+    const SOCKET_SERVER_URL = "https://buzzgame1-1.onrender.com";
+    const socket = io(SOCKET_SERVER_URL, { autoConnect: true });
+
+    let currentRoom = null;
+    let myName = "Host";
+    let answers = [];
+    let buzzOrder = [];
+    let allContestants = [];
+
+    let lockedAnswer = true;
+    let lockedBuzz = true;
+
+    let answerStartTime = 0;
+    let buzzStartTime = 0;
+    let useLocalBuzzTime = false;
+
+    let answerDuration_host = 0;
+    let answerEndTime_host = 0;
+    let buzzDuration_host = 0;
+    let buzzEndTime_host = 0;
+
+    const answerDurationInput = document.getElementById("answerDuration");
+    const buzzDurationInput = document.getElementById("buzzDuration");
+    const tblAnswersBody = document.querySelector("#tblAnswers tbody");
+    const tblBuzzBody = document.querySelector("#tblBuzz tbody");
+    const roomInfo = document.getElementById("roomInfo");
+
+    function showPopup(message, type = "success") {
+      const popup = document.getElementById("popupMessage");
+      popup.innerText = message;
+      popup.classList.remove("error");
+      if (type === "error") popup.classList.add("error");
+      popup.style.top = "20px";
+      popup.style.opacity = 1;
+      setTimeout(() => { popup.style.opacity = 0; popup.style.top = "-50px"; }, 3000);
+    }
+
+    function format(ms) {
+      if (ms < 0) ms = 0;
+      const totalSeconds = Math.floor(ms / 1000);
+      const milliseconds = ms % 1000;
+      return `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
+    }
+
+    // ĐÃ SỬA: Chỉ lấy 2 chữ số thập phân và bỏ chữ 's'
+    function formatTime(ts, startTime) {
+      if (startTime === 0) return "0.00";
+      const elapsed = ts - startTime;
+      if (elapsed < 0) return "0.00";
+      const totalSeconds = Math.floor(elapsed / 1000);
+      // Lấy 2 chữ số milliseconds
+      const milliseconds = Math.floor((elapsed % 1000) / 10);
+      return `${totalSeconds.toString()}.${milliseconds.toString().padStart(2, '0')}`;
+    }
+
+    function renderAnswers() {
+      tblAnswersBody.innerHTML = "";
+      answers.sort((a, b) => a.ts - b.ts);
+      answers.forEach(item => {
+        const row = tblAnswersBody.insertRow();
+        row.insertCell().innerText = item.name;
+        row.insertCell().innerText = item.answer;
+        row.insertCell().innerText = formatTime(item.ts, answerStartTime);
+      });
+    }
+
+    function renderBuzzList() {
+      tblBuzzBody.innerHTML = "";
+      buzzOrder.sort((a, b) => a.ts - b.ts);
+      buzzOrder.forEach(item => {
+        let elapsed = (useLocalBuzzTime && item.localTimestamp) ? (item.localTimestamp - buzzStartTime) : (item.ts - buzzStartTime);
+        if (elapsed < 0) elapsed = 0;
+        const sec = Math.floor(elapsed / 1000);
+        const ms = elapsed % 1000;
+        const row = tblBuzzBody.insertRow();
+        row.insertCell().innerText = item.name;
+        row.insertCell().innerText = `${sec}.${ms.toString().padStart(3, '0')}s`;
+      });
+    }
+
+    function updateStatusDisplay() {
+      const sA = document.getElementById("statusAnswer");
+      const sB = document.getElementById("statusBuzz");
+      sA.className = lockedAnswer ? "status-box locked" : "status-box open";
+      sA.innerText = lockedAnswer ? "Đáp án: 🔒 Đang khóa" : "Đáp án: 🔓 Đang mở";
+      sB.className = lockedBuzz ? "status-box locked" : "status-box open";
+      sB.innerText = lockedBuzz ? "Chuông: 🚫 Đang khóa" : "Chuông: 🔔 Đang mở";
+    }
+
+    function updateElapsedDisplay() {
+      const now = Date.now();
+      const aDisp = document.getElementById("answerTimeElapsed");
+      const bDisp = document.getElementById("buzzTimeElapsed");
+
+      if (!lockedAnswer && answerDuration_host > 0 && answerEndTime_host > 0) {
+        const remain = answerEndTime_host - now;
+        // In ra HTML bao gồm cả chữ và số giờ đều đậm do class CSS
+        aDisp.innerHTML = `Thời gian gửi đáp án còn lại: <span style="color:red;">${format(remain)}</span>`;
+      } else { aDisp.innerHTML = ""; }
+
+      if (!lockedBuzz && buzzDuration_host > 0 && buzzEndTime_host > 0) {
+        const remain = buzzEndTime_host - now;
+        bDisp.innerHTML = `Thời gian bấm chuông còn lại: <span style="color:red;">${format(remain)}</span>`;
+      } else { bDisp.innerHTML = ""; }
+    }
+    setInterval(updateElapsedDisplay, 100);
+
+    function renderUserList(host, managers, contestants) {
+      allContestants = contestants.map(c => c.name);
+      const ul = document.querySelector("#userListContainer ul");
+      ul.innerHTML = "";
+      if (host) {
+        const li = document.createElement("li");
+        li.innerHTML = `${host.id === socket.id ? '(Bạn) ' : ''}<b>${host.name}</b> <span class="role-host">(Host)</span>`;
+        ul.appendChild(li);
+      }
+      managers.forEach(m => {
+        const li = document.createElement("li");
+        li.innerHTML = `${m.id === socket.id ? '(Bạn) ' : ''}<b>${m.name}</b> <span class="role-manager">(Quản lý)</span>`;
+        ul.appendChild(li);
+      });
+      contestants.forEach(c => {
+        const li = document.createElement("li");
+        li.innerHTML = `<b>${c.name}</b> <span class="role-contestant">(Thí sinh)</span>`;
+        ul.appendChild(li);
+      });
+    }
+
+    const btnManualAdd = document.getElementById("btnManualAdd");
+    const addPopup = document.getElementById("addPopup");
+    const addRowsContainer = document.getElementById("addRowsContainer");
+
+    btnManualAdd.onclick = () => {
+      if (!currentRoom) return showPopup("Chưa có phòng!", "error");
+      socket.emit("host-get-users", currentRoom);
+      addPopup.style.display = "flex";
+      toggleAddType();
+    };
+
+    document.getElementById("btnCloseAdd").onclick = () => {
+      addPopup.style.display = "none";
+      addRowsContainer.innerHTML = "";
+    };
+
+    function toggleAddType() {
+      addRowsContainer.innerHTML = "";
+      document.getElementById("numAddRows").value = 1;
+    }
+
+    window.generateAddRows = function () {
+      const type = document.querySelector('input[name="addType"]:checked').value;
+      const num = parseInt(document.getElementById("numAddRows").value) || 1;
+      addRowsContainer.innerHTML = "";
+
+      for (let i = 0; i < num; i++) {
+        const div = document.createElement("div");
+        div.className = "add-row";
+        div.innerHTML += `<input type="text" placeholder="Tên" class="add-input-name">`;
+        if (type === "answer") div.innerHTML += `<input type="text" placeholder="Đáp án" class="add-input-ans">`;
+        div.innerHTML += `<input type="number" placeholder="Giây" step="0.1" class="add-input-time">`;
+        div.innerHTML += `<label style="font-weight:bold; color:black; font-size:14px;"><input type="checkbox" class="add-check-limit"> GH Time?</label>`;
+        addRowsContainer.appendChild(div);
+      }
+    }
+
+    document.getElementById("btnConfirmAdd").onclick = () => {
+      const type = document.querySelector('input[name="addType"]:checked').value;
+      const rows = document.querySelectorAll(".add-row");
+      const dataToSend = [];
+      let hasError = false;
+      const limitAnswerVal = parseFloat(answerDurationInput.value) || 0;
+      const limitBuzzVal = parseFloat(buzzDurationInput.value) || 0;
+
+      rows.forEach((row, idx) => {
+        if (hasError) return;
+        const name = row.querySelector(".add-input-name").value.trim();
+        const timeVal = parseFloat(row.querySelector(".add-input-time").value);
+        const checkLimit = row.querySelector(".add-check-limit").checked;
+
+        if (!name || !allContestants.includes(name)) {
+          showPopup(`Hàng ${idx + 1}: Tên sai hoặc trống`, "error");
+          hasError = true; return;
+        }
+        if (isNaN(timeVal) || timeVal < 0) {
+          showPopup(`Hàng ${idx + 1}: Thời gian sai`, "error");
+          hasError = true; return;
+        }
+        if (checkLimit) {
+          if (type === "answer" && limitAnswerVal > 0 && timeVal > limitAnswerVal) {
+            showPopup(`Hàng ${idx + 1}: Quá giờ`, "error");
+            hasError = true; return;
+          }
+          if (type === "buzz" && limitBuzzVal > 0 && timeVal > limitBuzzVal) {
+            showPopup(`Hàng ${idx + 1}: Quá giờ`, "error");
+            hasError = true; return;
+          }
+        }
+        if (type === "answer") {
+          const ans = row.querySelector(".add-input-ans").value.trim();
+          if (!ans) { showPopup(`Hàng ${idx + 1}: Thiếu đáp án`, "error"); hasError = true; return; }
+          dataToSend.push({ name, answer: ans, time: timeVal });
+        } else {
+          if (buzzOrder.some(b => b.name === name) || dataToSend.some(d => d.name === name)) {
+            showPopup(`Hàng ${idx + 1}: Đã bấm hoặc trùng`, "error"); hasError = true; return;
+          }
+          dataToSend.push({ name, time: timeVal });
+        }
+      });
+
+      if (hasError || dataToSend.length === 0) return;
+      socket.emit("host-force-add", { roomCode: currentRoom, type: type, data: dataToSend });
+      showPopup("Bổ sung thành công!");
+      addPopup.style.display = "none";
+      addRowsContainer.innerHTML = "";
+    };
+
+    socket.on("connect", () => { });
+    socket.on("room-created", (data) => {
+      currentRoom = data.roomCode;
+      myName = "Host";
+      roomInfo.innerText = `Phòng: ${currentRoom} | Vai trò: Host`;
+      answers = data.answers || [];
+      buzzOrder = data.buzzOrder || [];
+      renderAnswers(); renderBuzzList();
+      showPopup(`Đã tạo phòng ${currentRoom}`);
+    });
+
+    socket.on("manager-join-success", (data) => {
+      currentRoom = data.roomCode;
+      myName = data.name;
+      roomInfo.innerText = `Phòng: ${currentRoom} | Vai trò: Quản lý (${myName})`;
+      answers = data.answers || [];
+      buzzOrder = data.buzzOrder || [];
+      renderAnswers(); renderBuzzList();
+      document.getElementById("joinPopup").style.display = "none";
+      showPopup(`Tham gia thành công!`);
+    });
+
+    socket.on("join-error", (message) => showPopup(message, "error"));
+    socket.on("host-new-answer", data => {
+      const idx = answers.findIndex(x => x.name === data.name);
+      if (idx >= 0) answers[idx] = data;
+      else answers.push(data);
+      renderAnswers();
+    });
+    socket.on("host-new-buzz", data => {
+      if (!buzzOrder.find(b => b.name === data.name)) {
+        data.localTimestamp = Date.now();
+        buzzOrder.push(data);
+      }
+      renderBuzzList();
+    });
+    socket.on("answers-reset", () => { answers = []; renderAnswers(); showPopup("Reset đáp án!"); });
+    socket.on("buzz-reset", () => { buzzOrder = []; useLocalBuzzTime = true; buzzStartTime = Date.now(); renderBuzzList(); showPopup("Reset chuông!"); });
+
+    document.getElementById("unlockAnswersLimited").onclick = () => socket.emit("host-toggle-answer", { roomCode: currentRoom, state: "open", duration: Math.max(1, parseInt(answerDurationInput.value) || 0) });
+    document.getElementById("unlockAnswersPermanent").onclick = () => socket.emit("host-toggle-answer", { roomCode: currentRoom, state: "open", duration: 0 });
+    document.getElementById("lockAnswers").onclick = () => socket.emit("host-toggle-answer", { roomCode: currentRoom, state: "locked" });
+    document.getElementById("resetAnswers").onclick = () => socket.emit("host-reset-answers", currentRoom);
+
+    document.getElementById("unlockBuzzLimited").onclick = () => socket.emit("host-toggle-buzz", { roomCode: currentRoom, state: "open", duration: Math.max(1, parseInt(buzzDurationInput.value) || 0) });
+    document.getElementById("unlockBuzzPermanent").onclick = () => socket.emit("host-toggle-buzz", { roomCode: currentRoom, state: "open", duration: 0 });
+    document.getElementById("lockBuzz").onclick = () => socket.emit("host-toggle-buzz", { roomCode: currentRoom, state: "locked" });
+    document.getElementById("resetBuzz").onclick = () => socket.emit("host-reset-buzz", currentRoom);
+
+    socket.on("answer-status-changed", ({ state, duration, startTime }) => {
+      lockedAnswer = state === "locked";
+      answerDuration_host = duration || 0;
+      if (state === "open") {
+        answerStartTime = startTime || 0;
+        answerEndTime_host = (answerDuration_host > 0) ? Date.now() + (answerDuration_host * 1000) : 0;
+      }
+      updateStatusDisplay();
+    });
+
+    socket.on("buzz-status-changed", ({ state, duration, startTime }) => {
+      lockedBuzz = state === "locked";
+      buzzDuration_host = duration || 0;
+      if (state === "open") {
+        useLocalBuzzTime = false;
+        buzzStartTime = startTime || 0;
+        buzzEndTime_host = (buzzDuration_host > 0) ? Date.now() + (buzzDuration_host * 1000) : 0;
+      }
+      updateStatusDisplay();
+    });
+
+    document.getElementById("btnCreate").onclick = () => socket.emit("host-create-room", Math.floor(100000 + Math.random() * 900000));
+    document.getElementById("btnJoinManager").onclick = () => { document.getElementById("joinPopup").style.display = "flex"; document.getElementById("managerRoomCode").value = currentRoom || ""; };
+    document.getElementById("btnCloseJoin").onclick = () => document.getElementById("joinPopup").style.display = "none";
+    document.getElementById("btnConfirmManager").onclick = () => {
+      const code = document.getElementById("managerRoomCode").value.trim();
+      const name = document.getElementById("managerName").value.trim();
+      if (code.length !== 6 || !name) return showPopup("Lỗi nhập liệu", "error");
+      socket.emit("manager-join-room", { roomCode: parseInt(code), name });
+    };
+    document.getElementById("btnListUsers").onclick = () => { socket.emit("host-get-users", currentRoom); document.getElementById("listPopup").style.display = "flex"; };
+    document.getElementById("btnCloseList").onclick = () => document.getElementById("listPopup").style.display = "none";
+
+    socket.on("host-all-users", ({ host, managers, contestants }) => renderUserList(host, managers, contestants));
+    socket.on("host-new-user", (user) => { socket.emit("host-get-users", currentRoom); showPopup(`[${user.role}] ${user.name} vào phòng.`); });
+    socket.on("host-user-left", () => socket.emit("host-get-users", currentRoom));
+
+    document.getElementById("btnExportResults").onclick = () => {
+      if (!currentRoom || typeof XLSX === 'undefined') return;
+      const ws1 = [["Tên", "Đáp án", "Thời gian"]], ws2 = [["Tên", "Thời gian chuông"]];
+      answers.forEach(x => ws1.push([x.name, x.answer, formatTime(x.ts, answerStartTime)]));
+      buzzOrder.forEach(x => ws2.push([x.name, formatTime(x.ts, buzzStartTime)]));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws1), "DapAn");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws2), "Chuong");
+      XLSX.writeFile(wb, `KQ_${currentRoom}.xlsx`);
+    };
+  </script>
+</body>
+
+</html>
