@@ -96,12 +96,13 @@
     }
 
     /* CSS Khóa nút: Màu đen, chữ đậm trắng */
-    #btnBuzz.locked, #btnSend.locked {
+    #btnBuzz.locked,
+    #btnSend.locked {
       background: black !important;
       color: white !important;
       font-weight: bold;
       cursor: not-allowed;
-      opacity: 1; /* Đảm bảo hiển thị rõ màu đen */
+      opacity: 1;
     }
 
     #popupMessage {
@@ -168,279 +169,253 @@
   <div id="popupMessage"></div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<script>
+  <script>
 
-const SOCKET_SERVER_URL = "https://buzzgame1-1.onrender.com";
-const socket = io(SOCKET_SERVER_URL, { autoConnect: true });
+    const SOCKET_SERVER_URL = "https://buzzgame1-1.onrender.com";
+    const socket = io(SOCKET_SERVER_URL, { autoConnect: true });
 
-let isJoined = false;
-let myRoom = "";
-let myName = "";
+    let isJoined = false;
+    let myRoom = "";
+    let myName = "";
 
-// Mặc định là KHÓA
-let lockedAnswer = true;
-let lockedBuzz = true;
+    let lockedAnswer = true;
+    let lockedBuzz = true;
 
-let answerInterval = null;
-let buzzInterval = null;
+    let answerInterval = null;
+    let buzzInterval = null;
 
-const btnSend = document.getElementById("btnSend");
-const btnBuzz = document.getElementById("btnBuzz");
-const answerTextArea = document.getElementById("answer");
-const roomCodeInput = document.getElementById("roomCode");
-const nameInput = document.getElementById("name");
-const btnJoin = document.getElementById("btnJoin");
-const gameArea = document.getElementById("gameArea");
-const answerCountdown = document.getElementById("answerCountdown");
-const buzzCountdown = document.getElementById("buzzCountdown");
+    const btnSend = document.getElementById("btnSend");
+    const btnBuzz = document.getElementById("btnBuzz");
+    const answerTextArea = document.getElementById("answer");
+    const roomCodeInput = document.getElementById("roomCode");
+    const nameInput = document.getElementById("name");
+    const btnJoin = document.getElementById("btnJoin");
+    const gameArea = document.getElementById("gameArea");
+    const answerCountdown = document.getElementById("answerCountdown");
+    const buzzCountdown = document.getElementById("buzzCountdown");
 
-// ============ KHỞI TẠO TRẠNG THÁI KHÓA BAN ĐẦU ============
-function initLockedState() {
-    // Khóa nút gửi
-    btnSend.classList.add("locked");
-    btnSend.disabled = true;
-    
-    // Khóa textarea (Chặn nhập)
-    answerTextArea.disabled = true;
-    
-    // Khóa nút buzz
-    btnBuzz.classList.add("locked");
-    btnBuzz.disabled = true;
-}
+    // KHỞI TẠO KHÓA
+    function initLockedState() {
+      btnSend.classList.add("locked");
+      btnSend.disabled = true;
+      answerTextArea.disabled = true;
+      btnBuzz.classList.add("locked");
+      btnBuzz.disabled = true;
+    }
+    initLockedState();
 
-// Gọi ngay khi load trang (dù chưa vào phòng cũng cứ set style sẵn)
-initLockedState();
+    function showPopup(msg, type = "success") {
+      const p = document.getElementById("popupMessage");
+      p.innerText = msg;
+      p.classList.toggle("error", type === "error");
+      p.style.opacity = "0";
+      p.style.top = "20px";
+      void p.offsetHeight;
+      p.style.opacity = "1";
+      p.style.top = "40px";
+      setTimeout(() => { p.style.opacity = "0"; p.style.top = "20px"; }, 3000);
+    }
 
+    function format(ms) {
+      return (Math.max(0, ms) / 1000).toFixed(3) + "s";
+    }
 
-function showPopup(msg, type="success") {
-    const p = document.getElementById("popupMessage");
-    p.innerText = msg;
-    p.classList.toggle("error", type==="error");
-    p.style.opacity = "0";
-    p.style.top = "20px";
-    void p.offsetHeight;
-    p.style.opacity = "1";
-    p.style.top = "40px";
-    setTimeout(()=>{ p.style.opacity="0"; p.style.top="20px"; },3000);
-}
-
-function format(ms) {
-    return (Math.max(0,ms)/1000).toFixed(3)+"s";
-}
-
-// CẬP NHẬT TRẠNG THÁI UI ĐÁP ÁN
-function updateAnswerUI(isLocked) {
-    lockedAnswer = isLocked;
-    if (isLocked) {
+    // CẬP NHẬT UI VÀ AUTO FOCUS
+    function updateAnswerUI(isLocked) {
+      lockedAnswer = isLocked;
+      if (isLocked) {
         btnSend.classList.add("locked");
         btnSend.disabled = true;
-        answerTextArea.disabled = true; // Chặn nhập
-    } else {
+        answerTextArea.disabled = true;
+      } else {
         btnSend.classList.remove("locked");
         btnSend.disabled = false;
-        answerTextArea.disabled = false; // Cho phép nhập
-        answerTextArea.focus();
+        answerTextArea.disabled = false;
+
+        // === TỰ ĐỘNG FOCUS VÀO Ô NHẬP ===
+        setTimeout(() => {
+          answerTextArea.focus();
+        }, 50); // Delay nhỏ để đảm bảo DOM đã enable
+      }
     }
-}
 
-function startAnswerCountdown(startTime, duration) {
-    if (answerInterval) clearInterval(answerInterval);
+    function startAnswerCountdown(startTime, duration) {
+      if (answerInterval) clearInterval(answerInterval);
 
-    if (!startTime || duration <= 0) {
+      if (!startTime || duration <= 0) {
         document.getElementById("answerCountdown").innerText = "--.--s";
-        updateAnswerUI(false); // Mở khóa
+        updateAnswerUI(false);
         return;
-    }
+      }
 
-    const end = Date.now() + (duration) * 1000;
-    updateAnswerUI(false); // Mở khóa
+      const end = Date.now() + (duration) * 1000;
+      updateAnswerUI(false);
 
-    answerInterval = setInterval(()=>{
+      answerInterval = setInterval(() => {
         const remain = end - Date.now();
         if (remain <= 0) {
-            clearInterval(answerInterval);
-            answerInterval = null;
-            updateAnswerUI(true); // Khóa lại
-            document.getElementById("answerCountdown").innerText = "0.000s";
+          clearInterval(answerInterval);
+          answerInterval = null;
+          updateAnswerUI(true);
+          document.getElementById("answerCountdown").innerText = "0.000s";
         } else {
-            document.getElementById("answerCountdown").innerText = format(remain);
+          document.getElementById("answerCountdown").innerText = format(remain);
         }
-    }, 50);
-}
+      }, 50);
+    }
 
-function startBuzzCountdown(startTime, duration) {
-    if (buzzInterval) clearInterval(buzzInterval);
+    function startBuzzCountdown(startTime, duration) {
+      if (buzzInterval) clearInterval(buzzInterval);
 
-    if (!startTime || duration <= 0) {
+      if (!startTime || duration <= 0) {
         document.getElementById("buzzCountdown").innerText = "--.--s";
         lockedBuzz = false;
         btnBuzz.disabled = false;
         btnBuzz.classList.remove("locked");
         return;
-    }
+      }
 
-    const end = Date.now() + (duration) * 1000;
-    lockedBuzz = false;
-    btnBuzz.disabled = false;
-    btnBuzz.classList.remove("locked");
+      const end = Date.now() + (duration) * 1000;
+      lockedBuzz = false;
+      btnBuzz.disabled = false;
+      btnBuzz.classList.remove("locked");
 
-    buzzInterval = setInterval(()=>{
+      buzzInterval = setInterval(() => {
         const remain = end - Date.now();
         if (remain <= 0) {
-            clearInterval(buzzInterval);
-            buzzInterval = null;
-            lockedBuzz = true;
-            btnBuzz.disabled = true;
-            btnBuzz.classList.add("locked");
-            document.getElementById("buzzCountdown").innerText = "0.000s";
+          clearInterval(buzzInterval);
+          buzzInterval = null;
+          lockedBuzz = true;
+          btnBuzz.disabled = true;
+          btnBuzz.classList.add("locked");
+          document.getElementById("buzzCountdown").innerText = "0.000s";
         } else {
-            document.getElementById("buzzCountdown").innerText = format(remain);
+          document.getElementById("buzzCountdown").innerText = format(remain);
         }
-    }, 50);
-}
+      }, 50);
+    }
 
-// ========== JOIN ==========
-document.getElementById("btnJoin").onclick = () => {
-    const code = roomCodeInput.value.trim();
-    const name = nameInput.value.trim();
-    if (!code || !name) return showPopup("Nhập mã phòng + tên", "error");
-    if (code.length !== 6) return showPopup("Mã phòng phải 6 số", "error");
+    // JOIN ROOM
+    document.getElementById("btnJoin").onclick = () => {
+      const code = roomCodeInput.value.trim();
+      const name = nameInput.value.trim();
+      if (!code || !name) return showPopup("Nhập mã phòng + tên", "error");
+      if (code.length !== 6) return showPopup("Mã phòng phải 6 số", "error");
 
-    myRoom = code;
-    myName = name;
+      myRoom = code;
+      myName = name;
 
-    socket.emit("user-join-room", {
-        roomCode: parseInt(code),
-        name
-    });
-};
+      socket.emit("user-join-room", { roomCode: parseInt(code), name });
+    };
 
-socket.on("join-success", ({ roomCode, statusAnswer, statusBuzz }) => {
-    isJoined = true;
-    gameArea.style.display = "flex";
-    roomCodeInput.disabled = true;
-    nameInput.disabled = true;
-    btnJoin.disabled = true;
-    showPopup("Đã vào phòng "+roomCode);
+    socket.on("join-success", ({ roomCode, statusAnswer, statusBuzz }) => {
+      isJoined = true;
+      gameArea.style.display = "flex";
+      roomCodeInput.disabled = true;
+      nameInput.disabled = true;
+      btnJoin.disabled = true;
+      showPopup("Đã vào phòng " + roomCode);
 
-    // Cập nhật trạng thái ngay khi vào
-    if (statusAnswer === "locked") updateAnswerUI(true);
-    else updateAnswerUI(false);
+      if (statusAnswer === "locked") updateAnswerUI(true);
+      else updateAnswerUI(false);
 
-    if (statusBuzz === "locked") {
+      if (statusBuzz === "locked") {
         lockedBuzz = true;
         btnBuzz.classList.add("locked");
         btnBuzz.disabled = true;
-    } else {
+      } else {
         lockedBuzz = false;
         btnBuzz.classList.remove("locked");
         btnBuzz.disabled = false;
-    }
-});
+      }
+    });
 
-socket.on("join-failed", msg => showPopup(msg, "error"));
+    socket.on("join-failed", msg => showPopup(msg, "error"));
 
-// ========== SERVER GỬI TRẠNG THÁI ==========
-socket.on("answer-status-changed", ({ state, duration, startTime }) => {
-    if (state==="open") {
+    socket.on("answer-status-changed", ({ state, duration, startTime }) => {
+      if (state === "open") {
         startAnswerCountdown(startTime, duration);
-    } else {
+      } else {
         if (answerInterval) clearInterval(answerInterval);
         updateAnswerUI(true);
         answerCountdown.innerText = "0.000s";
-    }
-});
+      }
+    });
 
-socket.on("buzz-status-changed", ({ state, duration, startTime }) => {
-    if (state==="open") {
+    socket.on("buzz-status-changed", ({ state, duration, startTime }) => {
+      if (state === "open") {
         startBuzzCountdown(startTime, duration);
-    } else {
+      } else {
         if (buzzInterval) clearInterval(buzzInterval);
         lockedBuzz = true;
         buzzCountdown.innerText = "0.000s";
         btnBuzz.classList.add("locked");
         btnBuzz.disabled = true;
-    }
-});
+      }
+    });
 
-// ===========================================
-// ========== CHỨC NĂNG GỬI ĐÁP ÁN ==========
-// ===========================================
+    function sendAnswer() {
+      if (lockedAnswer) return showPopup("Đang khóa đáp án!", "error");
+      const text = answerTextArea.value.trim();
+      if (!text) return showPopup("Nhập đáp án!", "error");
 
-function sendAnswer() {
-    if (lockedAnswer) return showPopup("Đang khóa đáp án!", "error");
-    const text = answerTextArea.value.trim();
-    if (!text) return showPopup("Nhập đáp án!", "error");
-
-    socket.emit("user-send-answer", {
+      socket.emit("user-send-answer", {
         roomCode: parseInt(myRoom),
         name: myName,
         answer: text
-    });
-
-    showPopup("Đã gửi!");
-    // Xóa textbox tự động sau khi gửi
-    answerTextArea.value = "";
-}
-
-btnSend.onclick = sendAnswer;
-
-answerTextArea.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-        if (e.shiftKey) {
-        } else {
-            e.preventDefault();
-            sendAnswer();
-        }
+      });
+      showPopup("Đã gửi!");
+      answerTextArea.value = "";
+      // Sau khi gửi xong, vẫn giữ focus để thí sinh có thể sửa/gửi lại nếu Host cho phép
+      answerTextArea.focus();
     }
-});
 
-// ===========================================
-// ========== CHỨC NĂNG BẤM CHUÔNG ==========
-// ===========================================
+    btnSend.onclick = sendAnswer;
 
-function handleBuzz() {
-    if (lockedBuzz) return showPopup("Chuông đang khóa!", "error");
-    if (btnBuzz.disabled) return; 
-
-    socket.emit("user-buzz", {
-        roomCode: parseInt(myRoom),
-        name: myName
+    answerTextArea.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendAnswer();
+      }
     });
-    
-    btnBuzz.classList.add("locked");
-    btnBuzz.disabled = true;
 
-    showPopup("Đã bấm!");
-}
+    function handleBuzz() {
+      if (lockedBuzz) return showPopup("Chuông đang khóa!", "error");
+      if (btnBuzz.disabled) return;
 
-btnBuzz.onclick = handleBuzz;
+      socket.emit("user-buzz", { roomCode: parseInt(myRoom), name: myName });
+      btnBuzz.classList.add("locked");
+      btnBuzz.disabled = true;
+      showPopup("Đã bấm!");
+    }
 
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Control') { 
-        e.preventDefault(); 
+    btnBuzz.onclick = handleBuzz;
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Control') {
+        e.preventDefault();
         handleBuzz();
-    }
-});
+      }
+    });
 
-// BỔ SUNG: Nhận tín hiệu force-lock từ Server (khi Host add thủ công)
-socket.on("force-lock-buzz", () => {
-    btnBuzz.classList.add("locked");
-    btnBuzz.disabled = true;
-    showPopup("Host đã ghi nhận chuông của bạn!");
-});
+    socket.on("force-lock-buzz", () => {
+      btnBuzz.classList.add("locked");
+      btnBuzz.disabled = true;
+      showPopup("Host đã ghi nhận chuông của bạn!");
+    });
 
-socket.on("buzz-reset", () => {
-    btnBuzz.classList.remove("locked");
-    btnBuzz.disabled = false;
-    showPopup("Chuông đã được Host/Manager reset!");
-});
+    socket.on("buzz-reset", () => {
+      btnBuzz.classList.remove("locked");
+      btnBuzz.disabled = false;
+      showPopup("Chuông đã được Host/Manager reset!");
+    });
 
-socket.on("answers-reset", () => {
-    answerTextArea.value = ""; 
-    showPopup("Đáp án đã được Host/Manager reset!");
-});
+    socket.on("answers-reset", () => {
+      answerTextArea.value = "";
+      showPopup("Đáp án đã được Host/Manager reset!");
+    });
 
-</script>
+  </script>
 </body>
+
 </html>
