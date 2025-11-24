@@ -162,6 +162,7 @@
       opacity: 0;
       transition: opacity 0.5s, top 0.5s;
       font-weight: bold;
+      pointer-events: none;
     }
 
     .error {
@@ -451,6 +452,7 @@
       popup.innerText = message;
       popup.classList.remove("error");
       if (type === "error") popup.classList.add("error");
+      popup.style.pointerEvents = "auto";
       popup.style.top = "20px";
       popup.style.opacity = 1;
       setTimeout(() => { popup.style.opacity = 0; popup.style.top = "-50px"; }, 3000);

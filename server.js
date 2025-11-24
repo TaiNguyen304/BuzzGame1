@@ -322,6 +322,11 @@ io.on("connection", (socket) => {
             }
         }
     });
+
+    socket.on("connect", () => {
+        console.log("Đã kết nối tới Server ID: " + socket.id);
+        showPopup("Đã kết nối tới Server!", "success");
+    });
 });
 
 const PORT = process.env.PORT || 3000;
