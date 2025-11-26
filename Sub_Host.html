@@ -188,11 +188,9 @@
       margin-right: 10px;
     }
 
-    /* SỬA: Đảm bảo font-weight bold cho dòng đếm ngược */
     .time-elapsed-display {
       font-size: 1.2em;
       font-weight: bold !important;
-      /* Bắt buộc đậm */
       margin-top: 10px;
       height: 25px;
       color: black;
@@ -341,6 +339,15 @@
   <br>
 
   <h2>Bảng kết quả đáp án:</h2>
+
+  <div style="margin-bottom: 10px; font-weight: bold; color: black; display: flex; justify-content: center; gap: 30px;">
+    <label style="cursor: pointer;">
+      <input type="radio" name="sortOption" value="join" onchange="renderAnswers()"> Theo thứ tự vào phòng
+    </label>
+    <label style="cursor: pointer;">
+      <input type="radio" name="sortOption" value="time" checked onchange="renderAnswers()"> Theo thời gian trả lời
+    </label>
+  </div>
   <table id="tblAnswers">
     <thead>
       <tr>
@@ -427,7 +434,7 @@
     let myName = "Host";
     let answers = [];
     let buzzOrder = [];
-    let allContestants = [];
+    let allContestants = []; 
 
     let lockedAnswer = true;
     let lockedBuzz = true;
@@ -458,6 +465,20 @@
       setTimeout(() => { popup.style.opacity = 0; popup.style.top = "-50px"; }, 3000);
     }
 
+    // Đã sửa đổi: Chỉ lấy 2 chữ số thập phân và bỏ 's'
+    function formatTimeForTable(ts, startTime) {
+      if (startTime === 0) return "0.00";
+      const elapsed = ts - startTime;
+      if (elapsed < 0) return "0.00";
+      
+      const totalSeconds = Math.floor(elapsed / 1000);
+      // Lấy 2 chữ số thập phân (tương đương với Math.round((elapsed % 1000) / 10))
+      const hundredths = Math.floor(elapsed % 1000 / 10); 
+      
+      return `${totalSeconds.toString()}.${hundredths.toString().padStart(2, '0')}`;
+    }
+    
+    // Giữ nguyên format cho bộ đếm ngược
     function format(ms) {
       if (ms < 0) ms = 0;
       const totalSeconds = Math.floor(ms / 1000);
@@ -465,26 +486,43 @@
       return `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
     }
 
-    // ĐÃ SỬA: Chỉ lấy 2 chữ số thập phân và bỏ chữ 's'
-    function formatTime(ts, startTime) {
-      if (startTime === 0) return "0.00";
-      const elapsed = ts - startTime;
-      if (elapsed < 0) return "0.00";
-      const totalSeconds = Math.floor(elapsed / 1000);
-      // Lấy 2 chữ số milliseconds
-      const milliseconds = Math.floor((elapsed % 1000) / 10);
-      return `${totalSeconds.toString()}.${milliseconds.toString().padStart(2, '0')}`;
-    }
-
+    // CẬP NHẬT: Hàm renderAnswers để hỗ trợ sắp xếp và đồng bộ hóa
     function renderAnswers() {
       tblAnswersBody.innerHTML = "";
-      answers.sort((a, b) => a.ts - b.ts);
+      
+      const sortOptionElement = document.querySelector('input[name="sortOption"]:checked');
+      const sortOption = sortOptionElement ? sortOptionElement.value : 'time';
+
+      if (sortOption === "time") {
+        answers.sort((a, b) => a.ts - b.ts);
+      } else {
+        answers.sort((a, b) => {
+          let idxA = allContestants.indexOf(a.name);
+          let idxB = allContestants.indexOf(b.name);
+          
+          if (idxA === -1) idxA = 9999;
+          if (idxB === -1) idxB = 9999;
+          
+          return idxA - idxB;
+        });
+      }
+
       answers.forEach(item => {
         const row = tblAnswersBody.insertRow();
         row.insertCell().innerText = item.name;
         row.insertCell().innerText = item.answer;
-        row.insertCell().innerText = formatTime(item.ts, answerStartTime);
+        // Sử dụng hàm formatTimeForTable đã sửa đổi
+        row.insertCell().innerText = formatTimeForTable(item.ts, answerStartTime);
       });
+
+      // Gửi tín hiệu đồng bộ hóa sắp xếp lên máy chủ
+      if (currentRoom) {
+          socket.emit("host-sync-sort-config", { 
+              roomCode: currentRoom, 
+              sortOption: sortOption,
+              allContestants: allContestants // Gửi cả danh sách để Result.html có cơ sở sắp xếp theo thứ tự join
+          });
+      }
     }
 
     function renderBuzzList() {
@@ -517,7 +555,6 @@
 
       if (!lockedAnswer && answerDuration_host > 0 && answerEndTime_host > 0) {
         const remain = answerEndTime_host - now;
-        // In ra HTML bao gồm cả chữ và số giờ đều đậm do class CSS
         aDisp.innerHTML = `Thời gian gửi đáp án còn lại: <span style="color:red;">${format(remain)}</span>`;
       } else { aDisp.innerHTML = ""; }
 
@@ -528,8 +565,9 @@
     }
     setInterval(updateElapsedDisplay, 100);
 
+    // CẬP NHẬT: Lưu lại danh sách thí sinh và gọi renderAnswers()
     function renderUserList(host, managers, contestants) {
-      allContestants = contestants.map(c => c.name);
+      allContestants = contestants.map(c => c.name); // Cập nhật danh sách thí sinh để dùng cho sắp xếp
       const ul = document.querySelector("#userListContainer ul");
       ul.innerHTML = "";
       if (host) {
@@ -719,15 +757,30 @@
     document.getElementById("btnListUsers").onclick = () => { socket.emit("host-get-users", currentRoom); document.getElementById("listPopup").style.display = "flex"; };
     document.getElementById("btnCloseList").onclick = () => document.getElementById("listPopup").style.display = "none";
 
-    socket.on("host-all-users", ({ host, managers, contestants }) => renderUserList(host, managers, contestants));
+    socket.on("host-all-users", ({ host, managers, contestants }) => {
+        renderUserList(host, managers, contestants);
+        // BỔ SUNG: Gọi renderAnswers để áp dụng sắp xếp theo thứ tự vào phòng (nếu được chọn)
+        renderAnswers(); 
+    });
     socket.on("host-new-user", (user) => { socket.emit("host-get-users", currentRoom); showPopup(`[${user.role}] ${user.name} vào phòng.`); });
     socket.on("host-user-left", () => socket.emit("host-get-users", currentRoom));
 
     document.getElementById("btnExportResults").onclick = () => {
       if (!currentRoom || typeof XLSX === 'undefined') return;
       const ws1 = [["Tên", "Đáp án", "Thời gian"]], ws2 = [["Tên", "Thời gian chuông"]];
-      answers.forEach(x => ws1.push([x.name, x.answer, formatTime(x.ts, answerStartTime)]));
-      buzzOrder.forEach(x => ws2.push([x.name, formatTime(x.ts, buzzStartTime)]));
+      
+      // SỬA: Dùng formatTimeForTable cho Đáp án (2 chữ số thập phân, không 's')
+      answers.forEach(x => ws1.push([x.name, x.answer, formatTimeForTable(x.ts, answerStartTime)])); 
+      
+      // Giữ nguyên format cũ cho Chuông (3 chữ số thập phân, không 's' trong Excel)
+      buzzOrder.forEach(x => {
+        let elapsed = x.ts - buzzStartTime;
+        if (elapsed < 0) elapsed = 0;
+        const totalSeconds = Math.floor(elapsed / 1000);
+        const milliseconds = elapsed % 1000;
+        ws2.push([x.name, `${totalSeconds}.${milliseconds.toString().padStart(3, '0')}`]);
+      });
+      
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws1), "DapAn");
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws2), "Chuong");
