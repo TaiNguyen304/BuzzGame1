@@ -339,7 +339,7 @@
   <br>
 
   <h2>Bảng kết quả đáp án:</h2>
-  
+
   <div style="margin-bottom: 10px; font-weight: bold; color: black; display: flex; justify-content: center; gap: 30px;">
     <label style="cursor: pointer;">
       <input type="radio" name="sortOption" value="join" onchange="renderAnswers()"> Theo thứ tự vào phòng
@@ -434,7 +434,7 @@
     let myName = "Host";
     let answers = [];
     let buzzOrder = [];
-    let allContestants = [];
+    let allContestants = []; // MẢNG MỚI: Dùng để lưu thứ tự vào phòng
 
     let lockedAnswer = true;
     let lockedBuzz = true;
@@ -481,12 +481,13 @@
       return `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
     }
 
-    // CẬP NHẬT: Hàm renderAnswers để hỗ trợ sắp xếp
+    // CẬP NHẬT: Hàm renderAnswers để hỗ trợ sắp xếp và đồng bộ hóa
     function renderAnswers() {
       tblAnswersBody.innerHTML = "";
       
       // Lấy chế độ sắp xếp đang được chọn
-      const sortOption = document.querySelector('input[name="sortOption"]:checked').value;
+      const sortOptionElement = document.querySelector('input[name="sortOption"]:checked');
+      const sortOption = sortOptionElement ? sortOptionElement.value : 'time';
 
       if (sortOption === "time") {
         // Sắp xếp theo thời gian trả lời (nhanh nhất lên đầu)
@@ -511,6 +512,15 @@
         row.insertCell().innerText = item.answer;
         row.insertCell().innerText = formatTime(item.ts, answerStartTime);
       });
+
+      // BỔ SUNG: Gửi tín hiệu đồng bộ hóa sắp xếp lên máy chủ
+      if (currentRoom) {
+          socket.emit("host-sync-sort-config", { 
+              roomCode: currentRoom, 
+              sortOption: sortOption,
+              allContestants: allContestants // Gửi cả danh sách để Result.html có cơ sở sắp xếp theo thứ tự join
+          });
+      }
     }
 
     function renderBuzzList() {
@@ -553,6 +563,7 @@
     }
     setInterval(updateElapsedDisplay, 100);
 
+    // CẬP NHẬT: Lưu lại danh sách thí sinh và gọi renderAnswers()
     function renderUserList(host, managers, contestants) {
       allContestants = contestants.map(c => c.name); // Cập nhật danh sách thí sinh để dùng cho sắp xếp
       const ul = document.querySelector("#userListContainer ul");
@@ -745,10 +756,9 @@
     document.getElementById("btnCloseList").onclick = () => document.getElementById("listPopup").style.display = "none";
 
     socket.on("host-all-users", ({ host, managers, contestants }) => {
-        // Cập nhật danh sách UI và biến allContestants
         renderUserList(host, managers, contestants);
-        // Sau khi có danh sách mới, render lại đáp án để cập nhật thứ tự nếu đang chọn sort theo "join"
-        renderAnswers();
+        // BỔ SUNG: Gọi renderAnswers để áp dụng sắp xếp theo thứ tự vào phòng (nếu được chọn)
+        renderAnswers(); 
     });
     socket.on("host-new-user", (user) => { socket.emit("host-get-users", currentRoom); showPopup(`[${user.role}] ${user.name} vào phòng.`); });
     socket.on("host-user-left", () => socket.emit("host-get-users", currentRoom));
@@ -757,7 +767,7 @@
       if (!currentRoom || typeof XLSX === 'undefined') return;
       const ws1 = [["Tên", "Đáp án", "Thời gian"]], ws2 = [["Tên", "Thời gian chuông"]];
       answers.forEach(x => ws1.push([x.name, x.answer, formatTime(x.ts, answerStartTime).replace('s', '')]));
-      buzzOrder.forEach(x => ws2.push([x.name, formatTime(x.ts, buzzStartTime).replace('s', '')]));
+      buzzOrder.forEach(x => ws2.push([x.name, x.answer, formatTime(x.ts, buzzStartTime).replace('s', '')]));
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws1), "DapAn");
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws2), "Chuong");

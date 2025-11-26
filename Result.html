@@ -76,7 +76,6 @@
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
-        // NOTE: Hãy đảm bảo SOCKET_SERVER_URL khớp với địa chỉ máy chủ của bạn.
         const SOCKET_SERVER_URL = "https://buzzgame1-1.onrender.com"; 
         const socket = io(SOCKET_SERVER_URL, { autoConnect: true });
         
@@ -85,7 +84,11 @@
         const roomStatus = document.getElementById('roomStatus');
         
         let currentRoom = null; 
-        let initialRoomCode = null; // Mã phòng đọc từ URL
+        let initialRoomCode = null;
+        
+        // BỔ SUNG: Biến lưu trữ cấu hình sắp xếp
+        let currentSortOption = 'time'; // Mặc định sắp xếp theo thời gian
+        let allContestants = []; // Danh sách thí sinh theo thứ tự vào phòng (dùng cho sắp xếp 'join')
 
         function showMessage(text, isError = false) {
             messageBox.textContent = text;
@@ -96,37 +99,53 @@
             }, 3000);
         }
 
-        // Hàm đọc Mã phòng từ URL (?roomid=123456)
         function getRoomCodeFromUrl() {
             const params = new URLSearchParams(window.location.search);
             const roomid = params.get('roomid');
-            // Đảm bảo mã phòng là 6 chữ số
             if (roomid && roomid.length === 6 && !isNaN(roomid)) {
                 return parseInt(roomid);
             }
             return null;
         }
 
+        // CẬP NHẬT: Hàm renderResults để sắp xếp dữ liệu trước khi hiển thị
         function renderResults(data) {
             resultsContainer.innerHTML = ''; 
 
             if (data.length === 0) {
-                // Đảm bảo chữ đậm và không nghiêng
                 resultsContainer.innerHTML = '<p style="text-align:center; font-size: 1em; color: black;">Chưa có đáp án nào được gửi.</p>';
                 return;
             }
 
-            data.forEach(item => {
+            // BƯỚC 1: Sao chép và sắp xếp dữ liệu dựa trên cấu hình hiện tại
+            const sortedData = [...data];
+            
+            if (currentSortOption === "time") {
+                // Sắp xếp theo thời gian trả lời (time field in Result data is in seconds)
+                sortedData.sort((a, b) => a.time - b.time); 
+            } else if (currentSortOption === "join") { 
+                // Sắp xếp theo thứ tự vào phòng (dựa trên mảng allContestants)
+                sortedData.sort((a, b) => {
+                    let idxA = allContestants.indexOf(a.name);
+                    let idxB = allContestants.indexOf(b.name);
+                    
+                    // Nếu tên không có trong danh sách vào phòng thì đẩy xuống cuối
+                    if (idxA === -1) idxA = 9999;
+                    if (idxB === -1) idxB = 9999;
+                    
+                    return idxA - idxB;
+                });
+            }
+
+            // BƯỚC 2: Hiển thị dữ liệu đã sắp xếp
+            sortedData.forEach(item => {
                 const totalSeconds = Math.floor(item.time);
-                // Lấy 3 chữ số thập phân (milliseconds)
                 const milliseconds = Math.round((item.time % 1) * 1000); 
                 const formattedTime = `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
                 
-                // Định dạng: Tên người chơi | Đáp án | Thời gian (Toàn bộ là chữ đậm)
                 const resultText = `${item.name} | ${item.answer} | ${formattedTime}`;
                 
                 const p = document.createElement('p');
-                // Không cần thẻ <strong> vì CSS global đã là bold
                 p.textContent = resultText; 
                 p.style.fontSize = '1.2em';
                 p.style.borderBottom = '1px dashed #eee'; 
@@ -140,7 +159,6 @@
         
         // ========================= SOCKET.IO LOGIC =========================
 
-        // Hàm chung để tham gia phòng
         function joinRoom(roomCode, isRejoin = false) {
             if (!roomCode) {
                  roomStatus.textContent = "LỖI: URL thiếu Mã phòng (roomid=).";
@@ -170,6 +188,11 @@
         socket.on("viewer-join-success", (data) => {
             currentRoom = data.roomCode;
             roomStatus.textContent = `Đang xem kết quả Phòng: ${currentRoom}`;
+            
+            // BỔ SUNG: Nhận cấu hình sắp xếp ban đầu
+            currentSortOption = data.sortOption || 'time';
+            allContestants = data.allContestants || [];
+            
             renderResults(data.answers);
             showMessage(`Tham gia phòng ${currentRoom} thành công. Cập nhật tự động đã BẬT.`, false);
         });
@@ -183,8 +206,27 @@
         
         // Lắng nghe cập nhật kết quả (từ server)
         socket.on("update-results", (data) => {
-             renderResults(data);
+             // BỔ SUNG: Nhận cấu hình sắp xếp (nếu có)
+             currentSortOption = data.sortOption || currentSortOption;
+             allContestants = data.allContestants || allContestants;
+             
+             renderResults(data.answers);
              console.log("Results updated from server.");
+        });
+        
+        // BỔ SUNG: Lắng nghe sự kiện Host thay đổi thứ tự sắp xếp
+        socket.on("update-sort-config", (data) => {
+            if (data.sortOption) {
+                currentSortOption = data.sortOption;
+            }
+            if (data.allContestants) {
+                allContestants = data.allContestants;
+            }
+            
+            // Yêu cầu server gửi lại danh sách đáp án để renderResults có dữ liệu mới nhất
+            if (currentRoom) {
+                socket.emit("viewer-request-update", currentRoom);
+            }
         });
 
         // Sự kiện khi đáp án bị reset
@@ -198,7 +240,6 @@
              if (socket.connected) {
                  joinRoom(initialRoomCode);
              } 
-             // Logic connect sẽ tự xử lý nếu socket chưa kết nối
         };
     </script>
 </body>
