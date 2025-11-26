@@ -188,11 +188,9 @@
       margin-right: 10px;
     }
 
-    /* SỬA: Đảm bảo font-weight bold cho dòng đếm ngược */
     .time-elapsed-display {
       font-size: 1.2em;
       font-weight: bold !important;
-      /* Bắt buộc đậm */
       margin-top: 10px;
       height: 25px;
       color: black;
@@ -341,6 +339,15 @@
   <br>
 
   <h2>Bảng kết quả đáp án:</h2>
+  
+  <div style="margin-bottom: 10px; font-weight: bold; color: black; display: flex; justify-content: center; gap: 30px;">
+    <label style="cursor: pointer;">
+      <input type="radio" name="sortOption" value="join" onchange="renderAnswers()"> Theo thứ tự vào phòng
+    </label>
+    <label style="cursor: pointer;">
+      <input type="radio" name="sortOption" value="time" checked onchange="renderAnswers()"> Theo thời gian trả lời
+    </label>
+  </div>
   <table id="tblAnswers">
     <thead>
       <tr>
@@ -474,9 +481,30 @@
       return `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
     }
 
+    // CẬP NHẬT: Hàm renderAnswers để hỗ trợ sắp xếp
     function renderAnswers() {
       tblAnswersBody.innerHTML = "";
-      answers.sort((a, b) => a.ts - b.ts);
+      
+      // Lấy chế độ sắp xếp đang được chọn
+      const sortOption = document.querySelector('input[name="sortOption"]:checked').value;
+
+      if (sortOption === "time") {
+        // Sắp xếp theo thời gian trả lời (nhanh nhất lên đầu)
+        answers.sort((a, b) => a.ts - b.ts);
+      } else {
+        // Sắp xếp theo thứ tự vào phòng (dựa trên mảng allContestants)
+        answers.sort((a, b) => {
+          let idxA = allContestants.indexOf(a.name);
+          let idxB = allContestants.indexOf(b.name);
+          
+          // Nếu tên không có trong danh sách vào phòng thì đẩy xuống cuối
+          if (idxA === -1) idxA = 9999;
+          if (idxB === -1) idxB = 9999;
+          
+          return idxA - idxB;
+        });
+      }
+
       answers.forEach(item => {
         const row = tblAnswersBody.insertRow();
         row.insertCell().innerText = item.name;
@@ -515,7 +543,6 @@
 
       if (!lockedAnswer && answerDuration_host > 0 && answerEndTime_host > 0) {
         const remain = answerEndTime_host - now;
-        // In ra HTML bao gồm cả chữ và số giờ đều đậm do class CSS
         aDisp.innerHTML = `Thời gian gửi đáp án còn lại: <span style="color:red;">${format(remain)}</span>`;
       } else { aDisp.innerHTML = ""; }
 
@@ -527,7 +554,7 @@
     setInterval(updateElapsedDisplay, 100);
 
     function renderUserList(host, managers, contestants) {
-      allContestants = contestants.map(c => c.name);
+      allContestants = contestants.map(c => c.name); // Cập nhật danh sách thí sinh để dùng cho sắp xếp
       const ul = document.querySelector("#userListContainer ul");
       ul.innerHTML = "";
       if (host) {
@@ -717,7 +744,12 @@
     document.getElementById("btnListUsers").onclick = () => { socket.emit("host-get-users", currentRoom); document.getElementById("listPopup").style.display = "flex"; };
     document.getElementById("btnCloseList").onclick = () => document.getElementById("listPopup").style.display = "none";
 
-    socket.on("host-all-users", ({ host, managers, contestants }) => renderUserList(host, managers, contestants));
+    socket.on("host-all-users", ({ host, managers, contestants }) => {
+        // Cập nhật danh sách UI và biến allContestants
+        renderUserList(host, managers, contestants);
+        // Sau khi có danh sách mới, render lại đáp án để cập nhật thứ tự nếu đang chọn sort theo "join"
+        renderAnswers();
+    });
     socket.on("host-new-user", (user) => { socket.emit("host-get-users", currentRoom); showPopup(`[${user.role}] ${user.name} vào phòng.`); });
     socket.on("host-user-left", () => socket.emit("host-get-users", currentRoom));
 
