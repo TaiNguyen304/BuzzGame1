@@ -1,0 +1,27 @@
+{
+  "roomCode": 123456,
+  "sortOption": "time",
+  "allContestants": [
+    "Anh",
+    "Binh",
+    "Chi"
+  ],
+  "answers": [
+    {
+      "name": "Anh",
+      "answer": "A",
+      "time": 3.14
+    },
+    {
+      "name": "Binh",
+      "answer": "B",
+      "time": 4.01
+    },
+    {
+      "name": "Chi",
+      "answer": "C",
+      "time": 5.2
+    }
+  ],
+  "updatedAt": "2025-11-26T20:00:00+07:00"
+}
