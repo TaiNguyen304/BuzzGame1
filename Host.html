@@ -760,8 +760,14 @@
         // BỔ SUNG: Gọi renderAnswers để áp dụng sắp xếp theo thứ tự vào phòng (nếu được chọn)
         renderAnswers(); 
     });
+    
     socket.on("host-new-user", (user) => { socket.emit("host-get-users", currentRoom); showPopup(`[${user.role}] ${user.name} vào phòng.`); });
-    socket.on("host-user-left", () => socket.emit("host-get-users", currentRoom));
+    
+    // Đảm bảo việc cập nhật danh sách người dùng khi một người rời đi
+    socket.on("host-user-left", () => { 
+        socket.emit("host-get-users", currentRoom); 
+        showPopup("Một người dùng đã rời phòng.");
+    });
 
     document.getElementById("btnExportResults").onclick = () => {
       if (!currentRoom || typeof XLSX === 'undefined') return;

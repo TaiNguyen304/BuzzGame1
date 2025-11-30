@@ -763,7 +763,13 @@
         renderAnswers(); 
     });
     socket.on("host-new-user", (user) => { socket.emit("host-get-users", currentRoom); showPopup(`[${user.role}] ${user.name} vào phòng.`); });
-    socket.on("host-user-left", () => socket.emit("host-get-users", currentRoom));
+    
+    // ĐÃ SỬA: Cập nhật logic xử lý người dùng rời phòng
+    socket.on("host-user-left", ({ name, role }) => { 
+        // Lấy danh sách người dùng mới nhất từ máy chủ ngay lập tức để cập nhật giao diện
+        socket.emit("host-get-users", currentRoom); 
+        showPopup(`[${role}] ${name} đã rời phòng.`, "error");
+    });
 
     document.getElementById("btnExportResults").onclick = () => {
       if (!currentRoom || typeof XLSX === 'undefined') return;
