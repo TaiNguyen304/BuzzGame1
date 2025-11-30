@@ -425,8 +425,8 @@
   </div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
-  <script>
+<script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+<script>
     const SOCKET_SERVER_URL = "https://buzzgame1-1.onrender.com";
     const socket = io(SOCKET_SERVER_URL, { autoConnect: true });
 
@@ -434,15 +434,15 @@
     let myName = "Host";
     let answers = [];
     let buzzOrder = [];
-    let allContestants = []; // MẢNG MỚI: Dùng để lưu thứ tự vào phòng
+    let allContestants = []; 
 
     let lockedAnswer = true;
     let lockedBuzz = true;
 
     let answerStartTime = 0;
     let buzzStartTime = 0;
-    let useLocalBuzzTime = false;
-
+    
+    // Biến lưu thời gian để đếm ngược hiển thị
     let answerDuration_host = 0;
     let answerEndTime_host = 0;
     let buzzDuration_host = 0;
@@ -465,6 +465,7 @@
       setTimeout(() => { popup.style.opacity = 0; popup.style.top = "-50px"; }, 3000);
     }
 
+    // Format cho đồng hồ đếm ngược
     function format(ms) {
       if (ms < 0) ms = 0;
       const totalSeconds = Math.floor(ms / 1000);
@@ -472,36 +473,50 @@
       return `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
     }
 
+    // Format cho hiển thị bảng (X.YYYs)
     function formatTime(ts, startTime) {
-      if (startTime === 0) return "0.000s";
-      const elapsed = ts - startTime;
-      if (elapsed < 0) return "0.000s";
+      if (!startTime || startTime === 0) return "N/A";
+      let elapsed = ts - startTime;
+      if (elapsed < 0) elapsed = 0;
       const totalSeconds = Math.floor(elapsed / 1000);
       const milliseconds = elapsed % 1000;
       return `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
     }
+    
+    // Format riêng cho Excel (X.YY - 2 số thập phân cho đáp án, X.YYY cho chuông)
+    function formatTimeForExcel(ts, startTime, isBuzz = false) {
+        if (!startTime) return "0.00";
+        let elapsed = ts - startTime;
+        if (elapsed < 0) elapsed = 0;
+        
+        const sec = Math.floor(elapsed / 1000);
+        const ms = elapsed % 1000;
+        
+        if (isBuzz) {
+            // Chuông lấy 3 số thập phân
+            return `${sec}.${ms.toString().padStart(3, '0')}`;
+        } else {
+            // Đáp án lấy 2 số thập phân
+             const hundredths = Math.floor(ms / 10);
+            return `${sec}.${hundredths.toString().padStart(2, '0')}`;
+        }
+    }
 
-    // CẬP NHẬT: Hàm renderAnswers để hỗ trợ sắp xếp và đồng bộ hóa
+    // --- RENDER ANSWERS ---
     function renderAnswers() {
       tblAnswersBody.innerHTML = "";
       
-      // Lấy chế độ sắp xếp đang được chọn
       const sortOptionElement = document.querySelector('input[name="sortOption"]:checked');
       const sortOption = sortOptionElement ? sortOptionElement.value : 'time';
 
       if (sortOption === "time") {
-        // Sắp xếp theo thời gian trả lời (nhanh nhất lên đầu)
         answers.sort((a, b) => a.ts - b.ts);
       } else {
-        // Sắp xếp theo thứ tự vào phòng (dựa trên mảng allContestants)
         answers.sort((a, b) => {
           let idxA = allContestants.indexOf(a.name);
           let idxB = allContestants.indexOf(b.name);
-          
-          // Nếu tên không có trong danh sách vào phòng thì đẩy xuống cuối
           if (idxA === -1) idxA = 9999;
           if (idxB === -1) idxB = 9999;
-          
           return idxA - idxB;
         });
       }
@@ -513,27 +528,26 @@
         row.insertCell().innerText = formatTime(item.ts, answerStartTime);
       });
 
-      // BỔ SUNG: Gửi tín hiệu đồng bộ hóa sắp xếp lên máy chủ
       if (currentRoom) {
           socket.emit("host-sync-sort-config", { 
               roomCode: currentRoom, 
               sortOption: sortOption,
-              allContestants: allContestants // Gửi cả danh sách để Result.html có cơ sở sắp xếp theo thứ tự join
+              allContestants: allContestants 
           });
       }
     }
 
+    // --- RENDER BUZZ LIST (Sửa logic hiển thị) ---
     function renderBuzzList() {
       tblBuzzBody.innerHTML = "";
+      // Sắp xếp theo thời gian bấm (ts)
       buzzOrder.sort((a, b) => a.ts - b.ts);
+      
       buzzOrder.forEach(item => {
-        let elapsed = (useLocalBuzzTime && item.localTimestamp) ? (item.localTimestamp - buzzStartTime) : (item.ts - buzzStartTime);
-        if (elapsed < 0) elapsed = 0;
-        const sec = Math.floor(elapsed / 1000);
-        const ms = elapsed % 1000;
         const row = tblBuzzBody.insertRow();
         row.insertCell().innerText = item.name;
-        row.insertCell().innerText = `${sec}.${ms.toString().padStart(3, '0')}s`;
+        // Tính thời gian dựa trên buzzStartTime của server
+        row.insertCell().innerText = formatTime(item.ts, buzzStartTime);
       });
     }
 
@@ -563,9 +577,8 @@
     }
     setInterval(updateElapsedDisplay, 100);
 
-    // CẬP NHẬT: Lưu lại danh sách thí sinh và gọi renderAnswers()
     function renderUserList(host, managers, contestants) {
-      allContestants = contestants.map(c => c.name); // Cập nhật danh sách thí sinh để dùng cho sắp xếp
+      allContestants = contestants.map(c => c.name); 
       const ul = document.querySelector("#userListContainer ul");
       ul.innerHTML = "";
       if (host) {
@@ -585,6 +598,7 @@
       });
     }
 
+    // --- MANUAL ADD LOGIC ---
     const btnManualAdd = document.getElementById("btnManualAdd");
     const addPopup = document.getElementById("addPopup");
     const addRowsContainer = document.getElementById("addRowsContainer");
@@ -659,6 +673,7 @@
           if (!ans) { showPopup(`Hàng ${idx + 1}: Thiếu đáp án`, "error"); hasError = true; return; }
           dataToSend.push({ name, answer: ans, time: timeVal });
         } else {
+          // Check trùng
           if (buzzOrder.some(b => b.name === name) || dataToSend.some(d => d.name === name)) {
             showPopup(`Hàng ${idx + 1}: Đã bấm hoặc trùng`, "error"); hasError = true; return;
           }
@@ -673,14 +688,18 @@
       addRowsContainer.innerHTML = "";
     };
 
+    // --- SOCKET LISTENERS ---
+
     socket.on("connect", () => { });
+    
     socket.on("room-created", (data) => {
       currentRoom = data.roomCode;
       myName = "Host";
       roomInfo.innerText = `Phòng: ${currentRoom} | Vai trò: Host`;
       answers = data.answers || [];
       buzzOrder = data.buzzOrder || [];
-      renderAnswers(); renderBuzzList();
+      renderAnswers(); 
+      renderBuzzList();
       showPopup(`Đã tạo phòng ${currentRoom}`);
     });
 
@@ -690,28 +709,53 @@
       roomInfo.innerText = `Phòng: ${currentRoom} | Vai trò: Quản lý (${myName})`;
       answers = data.answers || [];
       buzzOrder = data.buzzOrder || [];
-      renderAnswers(); renderBuzzList();
+      renderAnswers(); 
+      renderBuzzList();
       document.getElementById("joinPopup").style.display = "none";
       showPopup(`Tham gia thành công!`);
     });
 
     socket.on("join-error", (message) => showPopup(message, "error"));
+
+    // Listener cho Đáp án mới
     socket.on("host-new-answer", data => {
       const idx = answers.findIndex(x => x.name === data.name);
       if (idx >= 0) answers[idx] = data;
       else answers.push(data);
       renderAnswers();
     });
-    socket.on("host-new-buzz", data => {
-      if (!buzzOrder.find(b => b.name === data.name)) {
-        data.localTimestamp = Date.now();
-        buzzOrder.push(data);
-      }
-      renderBuzzList();
+    
+    // === [FIX LỖI CHUÔNG Ở ĐÂY] ===
+    // Lắng nghe sự kiện "update-buzz-list" từ server để nhận danh sách đầy đủ
+    socket.on("update-buzz-list", (list) => {
+        buzzOrder = list;
+        renderBuzzList();
+        // Hiển thị thông báo ai vừa bấm
+        if(list.length > 0) {
+            const lastBuzzer = list[list.length - 1].name;
+            showPopup(`🔔 ${lastBuzzer} vừa bấm chuông!`);
+        }
     });
-    socket.on("answers-reset", () => { answers = []; renderAnswers(); showPopup("Reset đáp án!"); });
-    socket.on("buzz-reset", () => { buzzOrder = []; useLocalBuzzTime = true; buzzStartTime = Date.now(); renderBuzzList(); showPopup("Reset chuông!"); });
 
+    // Vẫn giữ lại listener này để hỗ trợ Manual Add (nếu server emit riêng)
+    socket.on("host-new-buzz", data => {
+        // Chỉ thêm nếu chưa có (phòng trường hợp trùng lặp với update-buzz-list)
+        if (!buzzOrder.find(b => b.name === data.name)) {
+            buzzOrder.push(data);
+            renderBuzzList();
+        }
+    });
+
+    socket.on("answers-reset", () => { answers = []; renderAnswers(); showPopup("Reset đáp án!"); });
+    
+    socket.on("buzz-reset", () => { 
+        buzzOrder = []; 
+        buzzStartTime = Date.now(); // Cập nhật lại mốc thời gian khi reset
+        renderBuzzList(); 
+        showPopup("Reset chuông!"); 
+    });
+
+    // --- BUTTON CONTROLS ---
     document.getElementById("unlockAnswersLimited").onclick = () => socket.emit("host-toggle-answer", { roomCode: currentRoom, state: "open", duration: Math.max(1, parseInt(answerDurationInput.value) || 0) });
     document.getElementById("unlockAnswersPermanent").onclick = () => socket.emit("host-toggle-answer", { roomCode: currentRoom, state: "open", duration: 0 });
     document.getElementById("lockAnswers").onclick = () => socket.emit("host-toggle-answer", { roomCode: currentRoom, state: "locked" });
@@ -736,7 +780,6 @@
       lockedBuzz = state === "locked";
       buzzDuration_host = duration || 0;
       if (state === "open") {
-        useLocalBuzzTime = false;
         buzzStartTime = startTime || 0;
         buzzEndTime_host = (buzzDuration_host > 0) ? Date.now() + (buzzDuration_host * 1000) : 0;
       }
@@ -757,29 +800,29 @@
 
     socket.on("host-all-users", ({ host, managers, contestants }) => {
         renderUserList(host, managers, contestants);
-        // BỔ SUNG: Gọi renderAnswers để áp dụng sắp xếp theo thứ tự vào phòng (nếu được chọn)
         renderAnswers(); 
     });
     
     socket.on("host-new-user", (user) => { socket.emit("host-get-users", currentRoom); showPopup(`[${user.role}] ${user.name} vào phòng.`); });
-    
-    // Đảm bảo việc cập nhật danh sách người dùng khi một người rời đi
-    socket.on("host-user-left", () => { 
+    socket.on("host-user-left", ({ name, role }) => { 
         socket.emit("host-get-users", currentRoom); 
-        showPopup("Một người dùng đã rời phòng.");
+        showPopup(`[${role}] ${name} đã rời phòng.`, "error");
     });
 
+    // --- EXPORT ---
     document.getElementById("btnExportResults").onclick = () => {
       if (!currentRoom || typeof XLSX === 'undefined') return;
       const ws1 = [["Tên", "Đáp án", "Thời gian"]], ws2 = [["Tên", "Thời gian chuông"]];
-      answers.forEach(x => ws1.push([x.name, x.answer, formatTime(x.ts, answerStartTime).replace('s', '')]));
-      buzzOrder.forEach(x => ws2.push([x.name, x.answer, formatTime(x.ts, buzzStartTime).replace('s', '')]));
+      
+      answers.forEach(x => ws1.push([x.name, x.answer, formatTimeForExcel(x.ts, answerStartTime, false)]));
+      buzzOrder.forEach(x => ws2.push([x.name, formatTimeForExcel(x.ts, buzzStartTime, true)]));
+      
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws1), "DapAn");
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws2), "Chuong");
       XLSX.writeFile(wb, `KQ_${currentRoom}.xlsx`);
     };
-  </script>
+</script>
 </body>
 
 </html>

@@ -425,13 +425,13 @@
   </div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
-  <script>
+<script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+<script>
     const SOCKET_SERVER_URL = "https://buzzgame1-1.onrender.com";
     const socket = io(SOCKET_SERVER_URL, { autoConnect: true });
 
     let currentRoom = null;
-    let myName = "Host";
+    let myName = "Manager";
     let answers = [];
     let buzzOrder = [];
     let allContestants = []; 
@@ -441,7 +441,6 @@
 
     let answerStartTime = 0;
     let buzzStartTime = 0;
-    let useLocalBuzzTime = false;
 
     let answerDuration_host = 0;
     let answerEndTime_host = 0;
@@ -465,28 +464,50 @@
       setTimeout(() => { popup.style.opacity = 0; popup.style.top = "-50px"; }, 3000);
     }
 
-    // Đã sửa đổi: Chỉ lấy 2 chữ số thập phân và bỏ 's'
     function formatTimeForTable(ts, startTime) {
-      if (startTime === 0) return "0.00";
-      const elapsed = ts - startTime;
-      if (elapsed < 0) return "0.00";
+      if (!startTime || startTime === 0) return "0.00";
+      let elapsed = ts - startTime;
+      if (elapsed < 0) elapsed = 0;
       
       const totalSeconds = Math.floor(elapsed / 1000);
-      // Lấy 2 chữ số thập phân (tương đương với Math.round((elapsed % 1000) / 10))
       const hundredths = Math.floor(elapsed % 1000 / 10); 
-      
       return `${totalSeconds.toString()}.${hundredths.toString().padStart(2, '0')}`;
     }
     
-    // Giữ nguyên format cho bộ đếm ngược
     function format(ms) {
       if (ms < 0) ms = 0;
       const totalSeconds = Math.floor(ms / 1000);
       const milliseconds = ms % 1000;
       return `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
     }
+    
+    function formatTime(ts, startTime) {
+      if (!startTime || startTime === 0) return "N/A";
+      let elapsed = ts - startTime;
+      if (elapsed < 0) elapsed = 0;
+      const totalSeconds = Math.floor(elapsed / 1000);
+      const milliseconds = elapsed % 1000;
+      return `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
+    }
 
-    // CẬP NHẬT: Hàm renderAnswers để hỗ trợ sắp xếp và đồng bộ hóa
+    // Format riêng cho Excel
+    function formatTimeForExcel(ts, startTime, isBuzz = false) {
+        if (!startTime) return "0.00";
+        let elapsed = ts - startTime;
+        if (elapsed < 0) elapsed = 0;
+        
+        const sec = Math.floor(elapsed / 1000);
+        const ms = elapsed % 1000;
+        
+        if (isBuzz) {
+            return `${sec}.${ms.toString().padStart(3, '0')}`;
+        } else {
+             const hundredths = Math.floor(ms / 10);
+            return `${sec}.${hundredths.toString().padStart(2, '0')}`;
+        }
+    }
+
+    // --- RENDER ANSWERS ---
     function renderAnswers() {
       tblAnswersBody.innerHTML = "";
       
@@ -499,10 +520,8 @@
         answers.sort((a, b) => {
           let idxA = allContestants.indexOf(a.name);
           let idxB = allContestants.indexOf(b.name);
-          
           if (idxA === -1) idxA = 9999;
           if (idxB === -1) idxB = 9999;
-          
           return idxA - idxB;
         });
       }
@@ -511,31 +530,27 @@
         const row = tblAnswersBody.insertRow();
         row.insertCell().innerText = item.name;
         row.insertCell().innerText = item.answer;
-        // Sử dụng hàm formatTimeForTable đã sửa đổi
         row.insertCell().innerText = formatTimeForTable(item.ts, answerStartTime);
       });
 
-      // Gửi tín hiệu đồng bộ hóa sắp xếp lên máy chủ
       if (currentRoom) {
           socket.emit("host-sync-sort-config", { 
               roomCode: currentRoom, 
               sortOption: sortOption,
-              allContestants: allContestants // Gửi cả danh sách để Result.html có cơ sở sắp xếp theo thứ tự join
+              allContestants: allContestants 
           });
       }
     }
 
+    // --- RENDER BUZZ LIST (Fix logic) ---
     function renderBuzzList() {
       tblBuzzBody.innerHTML = "";
       buzzOrder.sort((a, b) => a.ts - b.ts);
       buzzOrder.forEach(item => {
-        let elapsed = (useLocalBuzzTime && item.localTimestamp) ? (item.localTimestamp - buzzStartTime) : (item.ts - buzzStartTime);
-        if (elapsed < 0) elapsed = 0;
-        const sec = Math.floor(elapsed / 1000);
-        const ms = elapsed % 1000;
         const row = tblBuzzBody.insertRow();
         row.insertCell().innerText = item.name;
-        row.insertCell().innerText = `${sec}.${ms.toString().padStart(3, '0')}s`;
+        // Dùng formatTime chuẩn giống Host để hiển thị đầy đủ
+        row.insertCell().innerText = formatTime(item.ts, buzzStartTime);
       });
     }
 
@@ -565,9 +580,8 @@
     }
     setInterval(updateElapsedDisplay, 100);
 
-    // CẬP NHẬT: Lưu lại danh sách thí sinh và gọi renderAnswers()
     function renderUserList(host, managers, contestants) {
-      allContestants = contestants.map(c => c.name); // Cập nhật danh sách thí sinh để dùng cho sắp xếp
+      allContestants = contestants.map(c => c.name); 
       const ul = document.querySelector("#userListContainer ul");
       ul.innerHTML = "";
       if (host) {
@@ -675,6 +689,8 @@
       addRowsContainer.innerHTML = "";
     };
 
+    // --- SOCKET LISTENERS ---
+
     socket.on("connect", () => { });
     socket.on("room-created", (data) => {
       currentRoom = data.roomCode;
@@ -682,7 +698,8 @@
       roomInfo.innerText = `Phòng: ${currentRoom} | Vai trò: Host`;
       answers = data.answers || [];
       buzzOrder = data.buzzOrder || [];
-      renderAnswers(); renderBuzzList();
+      renderAnswers(); 
+      renderBuzzList();
       showPopup(`Đã tạo phòng ${currentRoom}`);
     });
 
@@ -692,27 +709,47 @@
       roomInfo.innerText = `Phòng: ${currentRoom} | Vai trò: Quản lý (${myName})`;
       answers = data.answers || [];
       buzzOrder = data.buzzOrder || [];
-      renderAnswers(); renderBuzzList();
+      renderAnswers(); 
+      renderBuzzList();
       document.getElementById("joinPopup").style.display = "none";
       showPopup(`Tham gia thành công!`);
     });
 
     socket.on("join-error", (message) => showPopup(message, "error"));
+    
     socket.on("host-new-answer", data => {
       const idx = answers.findIndex(x => x.name === data.name);
       if (idx >= 0) answers[idx] = data;
       else answers.push(data);
       renderAnswers();
     });
+
+    // === [FIX LỖI CHUÔNG Ở ĐÂY] ===
+    // Thêm listener cho update-buzz-list
+    socket.on("update-buzz-list", (list) => {
+        buzzOrder = list;
+        renderBuzzList();
+        if(list.length > 0) {
+            const lastBuzzer = list[list.length - 1].name;
+            showPopup(`🔔 ${lastBuzzer} vừa bấm chuông!`);
+        }
+    });
+
+    // Vẫn giữ host-new-buzz cho Manual Add
     socket.on("host-new-buzz", data => {
       if (!buzzOrder.find(b => b.name === data.name)) {
-        data.localTimestamp = Date.now();
         buzzOrder.push(data);
+        renderBuzzList();
       }
-      renderBuzzList();
     });
+
     socket.on("answers-reset", () => { answers = []; renderAnswers(); showPopup("Reset đáp án!"); });
-    socket.on("buzz-reset", () => { buzzOrder = []; useLocalBuzzTime = true; buzzStartTime = Date.now(); renderBuzzList(); showPopup("Reset chuông!"); });
+    socket.on("buzz-reset", () => { 
+        buzzOrder = []; 
+        buzzStartTime = Date.now();
+        renderBuzzList(); 
+        showPopup("Reset chuông!"); 
+    });
 
     document.getElementById("unlockAnswersLimited").onclick = () => socket.emit("host-toggle-answer", { roomCode: currentRoom, state: "open", duration: Math.max(1, parseInt(answerDurationInput.value) || 0) });
     document.getElementById("unlockAnswersPermanent").onclick = () => socket.emit("host-toggle-answer", { roomCode: currentRoom, state: "open", duration: 0 });
@@ -738,7 +775,6 @@
       lockedBuzz = state === "locked";
       buzzDuration_host = duration || 0;
       if (state === "open") {
-        useLocalBuzzTime = false;
         buzzStartTime = startTime || 0;
         buzzEndTime_host = (buzzDuration_host > 0) ? Date.now() + (buzzDuration_host * 1000) : 0;
       }
@@ -759,14 +795,10 @@
 
     socket.on("host-all-users", ({ host, managers, contestants }) => {
         renderUserList(host, managers, contestants);
-        // BỔ SUNG: Gọi renderAnswers để áp dụng sắp xếp theo thứ tự vào phòng (nếu được chọn)
         renderAnswers(); 
     });
     socket.on("host-new-user", (user) => { socket.emit("host-get-users", currentRoom); showPopup(`[${user.role}] ${user.name} vào phòng.`); });
-    
-    // ĐÃ SỬA: Cập nhật logic xử lý người dùng rời phòng
     socket.on("host-user-left", ({ name, role }) => { 
-        // Lấy danh sách người dùng mới nhất từ máy chủ ngay lập tức để cập nhật giao diện
         socket.emit("host-get-users", currentRoom); 
         showPopup(`[${role}] ${name} đã rời phòng.`, "error");
     });
@@ -775,24 +807,15 @@
       if (!currentRoom || typeof XLSX === 'undefined') return;
       const ws1 = [["Tên", "Đáp án", "Thời gian"]], ws2 = [["Tên", "Thời gian chuông"]];
       
-      // SỬA: Dùng formatTimeForTable cho Đáp án (2 chữ số thập phân, không 's')
-      answers.forEach(x => ws1.push([x.name, x.answer, formatTimeForTable(x.ts, answerStartTime)])); 
-      
-      // Giữ nguyên format cũ cho Chuông (3 chữ số thập phân, không 's' trong Excel)
-      buzzOrder.forEach(x => {
-        let elapsed = x.ts - buzzStartTime;
-        if (elapsed < 0) elapsed = 0;
-        const totalSeconds = Math.floor(elapsed / 1000);
-        const milliseconds = elapsed % 1000;
-        ws2.push([x.name, `${totalSeconds}.${milliseconds.toString().padStart(3, '0')}`]);
-      });
-      
+      answers.forEach(x => ws1.push([x.name, x.answer, formatTimeForExcel(x.ts, answerStartTime, false)])); 
+      buzzOrder.forEach(x => ws2.push([x.name, formatTimeForExcel(x.ts, buzzStartTime, true)]));
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws1), "DapAn");
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws2), "Chuong");
       XLSX.writeFile(wb, `KQ_${currentRoom}.xlsx`);
     };
-  </script>
+</script>
 </body>
 
 </html>
