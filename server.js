@@ -309,24 +309,31 @@ io.on("connection", (socket) => {
 
     socket.on("user-buzz", ({ roomCode, name }) => {
         const room = rooms[roomCode];
-        if (!room || room.statusBuzz === "locked") return socket.emit("buzz-error", "Chuông đang bị khóa!");
-        if (room.buzz.some(b => b.name === name)) return socket.emit("buzz-error", "Bạn đã bấm chuông!");
-
-        const newBuzz = { name, ts: Date.now() };
-        room.buzz.push(newBuzz);
-
-        io.to(room.hostId).emit("host-new-buzz", newBuzz);
-        room.managers.forEach(m => io.to(m.id).emit("host-new-buzz", newBuzz));
+        if (!room) return;
         
-        // Khóa chuông sau khi bấm nếu là giới hạn thời gian (duration > 0)
-        if (room.buzzDuration > 0) {
-            if (room.buzzTimer) {
-                 clearTimeout(room.buzzTimer);
-                 room.buzzTimer = null;
-            }
-            room.statusBuzz = "locked";
-            io.to(roomCode).emit("buzz-status-changed", { state: "locked" });
+        // 1. Kiểm tra trạng thái chuông có mở không (cả timed và permanent)
+        if (room.statusBuzz !== "open") {
+            return;
         }
+
+        // 2. Kiểm tra xem thí sinh đã bấm chuông trong vòng này chưa
+        if (room.buzz.some(b => b.name === name)) {
+            // Nếu đã bấm, gửi lại tín hiệu khóa cá nhân (phòng trường hợp client bị lỗi)
+            return socket.emit("force-lock-buzz"); 
+        }
+
+        // 3. Ghi nhận lượt bấm chuông
+        room.buzz.push({ 
+            name: name, 
+            ts: Date.now() 
+        });
+
+        // 4. Broadcast danh sách chuông mới đến Host/Managers/Viewers
+        io.to(roomCode).emit("update-buzz-list", room.buzz); 
+
+        // 5. Gửi tín hiệu khóa cá nhân (cho thí sinh vừa bấm)
+        // để đảm bảo nút của họ bị khóa ngay lập tức và vĩnh viễn trong vòng này
+        socket.emit("force-lock-buzz"); 
     });
 
     socket.on("disconnect", () => {
