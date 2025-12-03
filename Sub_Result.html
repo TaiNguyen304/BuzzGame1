@@ -24,14 +24,14 @@
         p {
             font-weight: bold !important;
             font-style: normal !important;
-            color: black !important;
         }
 
         /* Container thay thế cho khu vực nhập liệu */
         #headerContainer {
             margin-bottom: 20px;
             padding: 10px;
-            background: #f0f0f0;
+            background: yellow;
+            color: green;
             border-radius: 5px;
             text-align: center;
         }
@@ -137,7 +137,7 @@
     </div>
     
     <div id="resultsContainer">
-        <p style="text-align:center; font-weight: bold; font-size: 1em; color: black;">Đang chờ Mã phòng từ URL...</p>
+        <p style="text-align:center; font-weight: bold; font-size: 1em; color: blue;">Đang chờ Mã phòng từ URL...</p>
     </div>
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -243,6 +243,7 @@
         socket.on("viewer-join-success", (data) => {
             currentRoom = data.roomCode;
             roomStatus.textContent = `Đang xem kết quả Phòng: ${currentRoom}`;
+            roomStatus.textContent.color = "blue";
 
             currentSortOption = data.sortOption || 'time';
             allContestants = data.allContestants || [];
