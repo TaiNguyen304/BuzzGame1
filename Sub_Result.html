@@ -17,16 +17,11 @@
             font-weight: bold;
         }
 
-        /* Đảm bảo tất cả các tiêu đề và container con cũng là bold */
-        h2,
-        h3,
-        span,
-        p {
+        h2, h3, span, p {
             font-weight: bold !important;
             font-style: normal !important;
         }
 
-        /* Container thay thế cho khu vực nhập liệu */
         #headerContainer {
             margin-bottom: 20px;
             padding: 10px;
@@ -44,34 +39,21 @@
             min-height: 100px;
         }
 
-        /* Đã xóa #messageBox style */
-
-        /* Đảm bảo chữ đen và đậm cho các dòng kết quả */
         #resultsContainer p {
             color: black !important;
             font-weight: bold !important;
         }
 
-        /* ====== RADIO STYLE THEO YÊU CẦU ====== */
+        /* ====== RADIO STYLE ====== */
         .option-group {
             margin: 8px 0;
             font-weight: bold;
             text-align: center;
         }
 
-        /* Hàng 1 - màu tím */
-        .sort-option {
-            color: purple;
-            font-weight: bold;
-        }
+        .sort-option { color: purple; font-weight: bold; }
+        .time-option { color: red; font-weight: bold; }
 
-        /* Hàng 2 - màu đỏ */
-        .time-option {
-            color: red;
-            font-weight: bold;
-        }
-
-        /* Style ô tròn */
         .option-group input[type="radio"] {
             appearance: none;
             width: 18px;
@@ -84,12 +66,10 @@
             position: relative;
         }
 
-        /* Khi được chọn */
         .option-group input[type="radio"]:checked {
             border: 2px solid orange;
         }
 
-        /* Chấm tròn bên trong màu blue */
         .option-group input[type="radio"]:checked::before {
             content: '';
             position: absolute;
@@ -110,7 +90,6 @@
         <span id="roomStatus" style="color: blue;">Đang kết nối...</span>
     </div>
 
-    <!-- ===== HÀNG 1: THỨ TỰ THÍ SINH ===== -->
     <div class="option-group sort-option">
         <label>
             <input type="radio" name="sort" value="join" onclick="setSortOption('join')">
@@ -123,7 +102,6 @@
         </label>
     </div>
 
-    <!-- ===== HÀNG 2: HIỆN / ẨN THỜI GIAN ===== -->
     <div class="option-group time-option">
         <label>
             <input type="radio" name="timeDisplay" value="show" checked onclick="toggleTimeDisplay(true)">
@@ -151,10 +129,13 @@
         let currentRoom = null;
         let initialRoomCode = null;
 
-        let currentSortOption = 'time';
-        let allContestants = [];
-
-        // Đã xóa hàm showMessage()
+        // Các biến trạng thái hiển thị
+        let currentSortOption = 'time';     // 'time' hoặc 'join'
+        let isTimeVisible = true;           // true: hiện, false: ẩn
+        
+        // Dữ liệu
+        let allContestants = [];            // Danh sách thí sinh vào phòng (để sort)
+        let lastAnswersData = [];           // Lưu mảng kết quả gần nhất để render lại khi đổi option
 
         function getRoomCodeFromUrl() {
             const params = new URLSearchParams(window.location.search);
@@ -165,25 +146,53 @@
             return null;
         }
 
-        // CẬP NHẬT: Hàm renderResults để sắp xếp dữ liệu trước khi hiển thị (đồng bộ với Host)
+        // ================= XỬ LÝ UI: OPTION BUTTONS =================
+
+        // 1. Hàm xử lý khi bấm Radio Sắp xếp
+        function setSortOption(option) {
+            currentSortOption = option;
+            // Render lại dữ liệu cũ với chế độ sắp xếp mới
+            if (lastAnswersData.length > 0) {
+                renderResults(lastAnswersData);
+            }
+        }
+
+        // 2. Hàm xử lý khi bấm Radio Ẩn/Hiện thời gian (Đã bổ sung)
+        function toggleTimeDisplay(show) {
+            isTimeVisible = show;
+            // Render lại dữ liệu cũ với chế độ hiển thị mới
+            if (lastAnswersData.length > 0) {
+                renderResults(lastAnswersData);
+            }
+        }
+
+        // ================= HÀM RENDER CHÍNH =================
+
         function renderResults(data) {
+            // Lưu lại dữ liệu để dùng khi user đổi option mà không cần server gửi lại
+            lastAnswersData = data; 
+            
             resultsContainer.innerHTML = '';
 
-            if (data.length === 0) {
+            if (!data || data.length === 0) {
                 resultsContainer.innerHTML = '<p style="text-align:center; font-size: 1em; color: black;">Chưa có đáp án nào được gửi.</p>';
                 return;
             }
 
-            // BƯỚC 1: Sao chép và sắp xếp dữ liệu dựa trên cấu hình hiện tại (đồng bộ với Host)
+            // BƯỚC 1: Sao chép mảng để không ảnh hưởng dữ liệu gốc
             const sortedData = [...data];
 
+            // BƯỚC 2: Sắp xếp
             if (currentSortOption === "time") {
+                // Sắp xếp theo thời gian trả lời (nhanh nhất lên đầu)
                 sortedData.sort((a, b) => a.time - b.time);
             } else if (currentSortOption === "join") {
+                // Sắp xếp theo danh sách vào phòng (lấy từ Host)
                 sortedData.sort((a, b) => {
                     let idxA = allContestants.indexOf(a.name);
                     let idxB = allContestants.indexOf(b.name);
 
+                    // Nếu tên không có trong danh sách gốc, đẩy xuống cuối
                     if (idxA === -1) idxA = 9999;
                     if (idxB === -1) idxB = 9999;
 
@@ -191,14 +200,20 @@
                 });
             }
 
-            // BƯỚC 2: Hiển thị dữ liệu đã sắp xếp
+            // BƯỚC 3: Hiển thị
             sortedData.forEach(item => {
-                const totalSeconds = Math.floor(item.time);
-                // Lấy 2 chữ số thập phân (đảm bảo hiển thị giống Host)
-                const hundredths = Math.floor((item.time % 1) * 100);
-                const formattedTime = `${totalSeconds.toString()}.${hundredths.toString().padStart(2, '0')}`;
+                let resultText = "";
 
-                const resultText = `${item.name} | ${item.answer} | ${formattedTime}`;
+                if (isTimeVisible) {
+                    // Nếu chế độ Hiện thời gian
+                    const totalSeconds = Math.floor(item.time);
+                    const hundredths = Math.floor((item.time % 1) * 100);
+                    const formattedTime = `${totalSeconds.toString()}.${hundredths.toString().padStart(2, '0')}`;
+                    resultText = `${item.name} | ${item.answer} | ${formattedTime}`;
+                } else {
+                    // Nếu chế độ Ẩn thời gian: Chỉ hiện Tên và Đáp án
+                    resultText = `${item.name} | ${item.answer}`;
+                }
 
                 const p = document.createElement('p');
                 p.textContent = resultText;
@@ -243,48 +258,53 @@
         socket.on("viewer-join-success", (data) => {
             currentRoom = data.roomCode;
             roomStatus.textContent = `Đang xem kết quả Phòng: ${currentRoom}`;
-            roomStatus.textContent.color = "blue";
+            roomStatus.style.color = "blue";
 
-            currentSortOption = data.sortOption || 'time';
-            allContestants = data.allContestants || [];
+            // Cập nhật cấu hình từ server (nếu muốn đồng bộ ban đầu)
+            // Tuy nhiên ưu tiên thao tác tại local của Viewer hơn
+            if (data.allContestants) {
+                allContestants = data.allContestants;
+            }
 
             renderResults(data.answers);
-            // Đã xóa dòng showMessage
         });
 
         // Lắng nghe lỗi khi tham gia
         socket.on("join-error", (message) => {
             roomStatus.textContent = `Lỗi tham gia phòng: ${initialRoomCode}`;
-            // Đã xóa dòng showMessage
             resultsContainer.innerHTML = `<p style="text-align:center; font-size: 1em; color: red;">${message}</p>`;
         });
 
         // Lắng nghe cập nhật kết quả (từ server)
         socket.on("update-results", (data) => {
-            currentSortOption = data.sortOption || currentSortOption;
-            allContestants = data.allContestants || allContestants;
-
-            renderResults(data.answers);
-            console.log("Results updated from server.");
-        });
-
-        // BỔ SUNG: Lắng nghe sự kiện Host thay đổi thứ tự sắp xếp
-        socket.on("update-sort-config", (data) => {
-            if (data.sortOption) {
-                currentSortOption = data.sortOption;
-            }
+            // Khi có kết quả mới, cập nhật danh sách thí sinh luôn để đảm bảo sort đúng
             if (data.allContestants) {
                 allContestants = data.allContestants;
             }
+            renderResults(data.answers);
+        });
 
+        // Lắng nghe sự kiện Host thay đổi thứ tự hoặc danh sách thí sinh
+        socket.on("update-sort-config", (data) => {
+            // Chủ yếu lấy danh sách thí sinh (allContestants) để sort cho đúng
+            if (data.allContestants) {
+                allContestants = data.allContestants;
+            }
+            
+            // Nếu muốn Viewer tự động đổi kiểu sort theo Host thì bỏ comment dòng dưới:
+            // if (data.sortOption) { currentSortOption = data.sortOption; }
+
+            // Render lại với dữ liệu hiện có
             if (currentRoom) {
-                socket.emit("viewer-request-update", currentRoom);
+                // Cách tốt nhất là render lại lastAnswersData với allContestants mới
+                renderResults(lastAnswersData);
             }
         });
 
         // Sự kiện khi đáp án bị reset
         socket.on("answers-reset", () => {
-            // Đã xóa dòng showMessage
+            lastAnswersData = [];
+            renderResults([]);
         });
 
         // Khởi tạo: Đọc mã phòng từ URL và tự động tham gia
@@ -295,30 +315,6 @@
             }
         };
 
-        function setSortOption(option) {
-            currentSortOption = option;
-
-            if (currentRoom) {
-                renderResults(lastResults || []);
-            }
-        }
-
-        /* Lưu dữ liệu gần nhất để render lại */
-        let lastResults = [];
-
-        const originalRender = renderResults;
-        renderResults = function (data) {
-            lastResults = data;
-            originalRender(data);
-        };
-
-        function setSortOption(option) {
-            currentSortOption = option;
-
-            if (lastResultData.length > 0) {
-                renderResults(lastResultData);
-            }
-        }
     </script>
 </body>
 
