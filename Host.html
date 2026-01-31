@@ -55,7 +55,7 @@
     }
 
     #tblBuzz {
-      width: 600px;
+      width: 90%;
     }
 
     #roomInfo {
@@ -276,18 +276,42 @@
     }
 
     .role-host {
-      color: blue;
+      color: green;
       font-weight: bold;
     }
 
     .role-manager {
-      color: red;
+      color: blue;
       font-weight: bold;
     }
 
     .role-contestant {
-      color: black;
+      color: purple;
       font-weight: bold;
+    }
+
+    /* (Bạn) */
+    .you {
+      font-weight: bold;
+      color: black;
+    }
+
+    /* Username chung */
+    .username {
+      font-weight: bold;
+    }
+
+    /* Theo role */
+    .role-host-name {
+      color: green;
+    }
+
+    .role-manager-name {
+      color: blue;
+    }
+
+    .role-contestant-name {
+      color: purple;
     }
   </style>
 </head>
@@ -431,8 +455,8 @@
   </div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
-<script>
+  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+  <script>
     const SOCKET_SERVER_URL = "https://buzzgame1-1.onrender.com";
     const socket = io(SOCKET_SERVER_URL, { autoConnect: true });
 
@@ -440,14 +464,14 @@
     let myName = "Host";
     let answers = [];
     let buzzOrder = [];
-    let allContestants = []; 
+    let allContestants = [];
 
     let lockedAnswer = true;
     let lockedBuzz = true;
 
     let answerStartTime = 0;
     let buzzStartTime = 0;
-    
+
     // Biến lưu thời gian để đếm ngược hiển thị
     let answerDuration_host = 0;
     let answerEndTime_host = 0;
@@ -488,30 +512,30 @@
       const milliseconds = elapsed % 1000;
       return `${totalSeconds.toString()}.${milliseconds.toString().padStart(3, '0')}s`;
     }
-    
+
     // Format riêng cho Excel (X.YY - 2 số thập phân cho đáp án, X.YYY cho chuông)
     function formatTimeForExcel(ts, startTime, isBuzz = false) {
-        if (!startTime) return "0.00";
-        let elapsed = ts - startTime;
-        if (elapsed < 0) elapsed = 0;
-        
-        const sec = Math.floor(elapsed / 1000);
-        const ms = elapsed % 1000;
-        
-        if (isBuzz) {
-            // Chuông lấy 3 số thập phân
-            return `${sec}.${ms.toString().padStart(3, '0')}`;
-        } else {
-            // Đáp án lấy 2 số thập phân
-             const hundredths = Math.floor(ms / 10);
-            return `${sec}.${hundredths.toString().padStart(2, '0')}`;
-        }
+      if (!startTime) return "0.00";
+      let elapsed = ts - startTime;
+      if (elapsed < 0) elapsed = 0;
+
+      const sec = Math.floor(elapsed / 1000);
+      const ms = elapsed % 1000;
+
+      if (isBuzz) {
+        // Chuông lấy 3 số thập phân
+        return `${sec}.${ms.toString().padStart(3, '0')}`;
+      } else {
+        // Đáp án lấy 2 số thập phân
+        const hundredths = Math.floor(ms / 10);
+        return `${sec}.${hundredths.toString().padStart(2, '0')}`;
+      }
     }
 
     // --- RENDER ANSWERS ---
     function renderAnswers() {
       tblAnswersBody.innerHTML = "";
-      
+
       const sortOptionElement = document.querySelector('input[name="sortOption"]:checked');
       const sortOption = sortOptionElement ? sortOptionElement.value : 'time';
 
@@ -535,11 +559,11 @@
       });
 
       if (currentRoom) {
-          socket.emit("host-sync-sort-config", { 
-              roomCode: currentRoom, 
-              sortOption: sortOption,
-              allContestants: allContestants 
-          });
+        socket.emit("host-sync-sort-config", {
+          roomCode: currentRoom,
+          sortOption: sortOption,
+          allContestants: allContestants
+        });
       }
     }
 
@@ -548,7 +572,7 @@
       tblBuzzBody.innerHTML = "";
       // Sắp xếp theo thời gian bấm (ts)
       buzzOrder.sort((a, b) => a.ts - b.ts);
-      
+
       buzzOrder.forEach(item => {
         const row = tblBuzzBody.insertRow();
         row.insertCell().innerText = item.name;
@@ -584,22 +608,36 @@
     setInterval(updateElapsedDisplay, 100);
 
     function renderUserList(host, managers, contestants) {
-      allContestants = contestants.map(c => c.name); 
+      allContestants = contestants.map(c => c.name);
       const ul = document.querySelector("#userListContainer ul");
       ul.innerHTML = "";
+
       if (host) {
         const li = document.createElement("li");
-        li.innerHTML = `${host.id === socket.id ? '(Bạn) ' : ''}<b>${host.name}</b> <span class="role-host">(Host)</span>`;
+        li.innerHTML = `
+      ${host.id === socket.id ? '<strong class="you">(Bạn)</strong> ' : ''}
+      <span class="username role-host-name">${host.name}</span>
+      <span class="role-host">(Host)</span>
+    `;
         ul.appendChild(li);
       }
+
       managers.forEach(m => {
         const li = document.createElement("li");
-        li.innerHTML = `${m.id === socket.id ? '(Bạn) ' : ''}<b>${m.name}</b> <span class="role-manager">(Quản lý)</span>`;
+        li.innerHTML = `
+      ${m.id === socket.id ? '<strong class="you">(Bạn)</strong> ' : ''}
+      <span class="username role-manager-name">${m.name}</span>
+      <span class="role-manager">(Quản lý)</span>
+    `;
         ul.appendChild(li);
       });
+
       contestants.forEach(c => {
         const li = document.createElement("li");
-        li.innerHTML = `<b>${c.name}</b> <span class="role-contestant">(Thí sinh)</span>`;
+        li.innerHTML = `
+      <span class="username role-contestant-name">${c.name}</span>
+      <span class="role-contestant">(Thí sinh)</span>
+    `;
         ul.appendChild(li);
       });
     }
@@ -697,14 +735,14 @@
     // --- SOCKET LISTENERS ---
 
     socket.on("connect", () => { });
-    
+
     socket.on("room-created", (data) => {
       currentRoom = data.roomCode;
       myName = "Host";
       roomInfo.innerText = `Phòng: ${currentRoom} | Vai trò: Host`;
       answers = data.answers || [];
       buzzOrder = data.buzzOrder || [];
-      renderAnswers(); 
+      renderAnswers();
       renderBuzzList();
       showPopup(`Đã tạo phòng ${currentRoom}`);
     });
@@ -715,7 +753,7 @@
       roomInfo.innerText = `Phòng: ${currentRoom} | Vai trò: Quản lý (${myName})`;
       answers = data.answers || [];
       buzzOrder = data.buzzOrder || [];
-      renderAnswers(); 
+      renderAnswers();
       renderBuzzList();
       document.getElementById("joinPopup").style.display = "none";
       showPopup(`Tham gia thành công!`);
@@ -730,35 +768,35 @@
       else answers.push(data);
       renderAnswers();
     });
-    
+
     // === [FIX LỖI CHUÔNG Ở ĐÂY] ===
     // Lắng nghe sự kiện "update-buzz-list" từ server để nhận danh sách đầy đủ
     socket.on("update-buzz-list", (list) => {
-        buzzOrder = list;
-        renderBuzzList();
-        // Hiển thị thông báo ai vừa bấm
-        if(list.length > 0) {
-            const lastBuzzer = list[list.length - 1].name;
-            showPopup(`🔔 ${lastBuzzer} vừa bấm chuông!`);
-        }
+      buzzOrder = list;
+      renderBuzzList();
+      // Hiển thị thông báo ai vừa bấm
+      if (list.length > 0) {
+        const lastBuzzer = list[list.length - 1].name;
+        showPopup(`🔔 ${lastBuzzer} vừa bấm chuông!`);
+      }
     });
 
     // Vẫn giữ lại listener này để hỗ trợ Manual Add (nếu server emit riêng)
     socket.on("host-new-buzz", data => {
-        // Chỉ thêm nếu chưa có (phòng trường hợp trùng lặp với update-buzz-list)
-        if (!buzzOrder.find(b => b.name === data.name)) {
-            buzzOrder.push(data);
-            renderBuzzList();
-        }
+      // Chỉ thêm nếu chưa có (phòng trường hợp trùng lặp với update-buzz-list)
+      if (!buzzOrder.find(b => b.name === data.name)) {
+        buzzOrder.push(data);
+        renderBuzzList();
+      }
     });
 
     socket.on("answers-reset", () => { answers = []; renderAnswers(); showPopup("Reset đáp án!"); });
-    
-    socket.on("buzz-reset", () => { 
-        buzzOrder = []; 
-        buzzStartTime = Date.now(); // Cập nhật lại mốc thời gian khi reset
-        renderBuzzList(); 
-        showPopup("Reset chuông!"); 
+
+    socket.on("buzz-reset", () => {
+      buzzOrder = [];
+      buzzStartTime = Date.now(); // Cập nhật lại mốc thời gian khi reset
+      renderBuzzList();
+      showPopup("Reset chuông!");
     });
 
     // --- BUTTON CONTROLS ---
@@ -805,30 +843,30 @@
     document.getElementById("btnCloseList").onclick = () => document.getElementById("listPopup").style.display = "none";
 
     socket.on("host-all-users", ({ host, managers, contestants }) => {
-        renderUserList(host, managers, contestants);
-        renderAnswers(); 
+      renderUserList(host, managers, contestants);
+      renderAnswers();
     });
-    
+
     socket.on("host-new-user", (user) => { socket.emit("host-get-users", currentRoom); showPopup(`[${user.role}] ${user.name} vào phòng.`); });
-    socket.on("host-user-left", ({ name, role }) => { 
-        socket.emit("host-get-users", currentRoom); 
-        showPopup(`[${role}] ${name} đã rời phòng.`, "error");
+    socket.on("host-user-left", ({ name, role }) => {
+      socket.emit("host-get-users", currentRoom);
+      showPopup(`[${role}] ${name} đã rời phòng.`, "error");
     });
 
     // --- EXPORT ---
     document.getElementById("btnExportResults").onclick = () => {
       if (!currentRoom || typeof XLSX === 'undefined') return;
       const ws1 = [["Tên", "Đáp án", "Thời gian"]], ws2 = [["Tên", "Thời gian chuông"]];
-      
+
       answers.forEach(x => ws1.push([x.name, x.answer, formatTimeForExcel(x.ts, answerStartTime, false)]));
       buzzOrder.forEach(x => ws2.push([x.name, formatTimeForExcel(x.ts, buzzStartTime, true)]));
-      
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws1), "DapAn");
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws2), "Chuong");
       XLSX.writeFile(wb, `KQ_${currentRoom}.xlsx`);
     };
-</script>
+  </script>
 </body>
 
 </html>
