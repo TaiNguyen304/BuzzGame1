@@ -866,6 +866,10 @@
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws2), "Chuong");
       XLSX.writeFile(wb, `KQ_${currentRoom}.xlsx`);
     };
+
+    document.addEventListener("contextmenu", function (e) {
+      e.preventDefault();
+    });
   </script>
 </body>
 

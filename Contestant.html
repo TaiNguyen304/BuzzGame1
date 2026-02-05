@@ -466,7 +466,10 @@
       answerTextArea.value = "";
       showPopup("Đáp án đã được Host/Manager reset!");
     });
-
+    
+    document.addEventListener("contextmenu", function (e) {
+      e.preventDefault();
+    });
   </script>
 </body>
 </html>
