@@ -194,6 +194,7 @@
     let answerInterval = null;
     let buzzInterval = null;
 
+    const buzzSound = new Audio('buzzer.mp3');
     const btnSend = document.getElementById("btnSend");
     const btnBuzz = document.getElementById("btnBuzz");
     const answerTextArea = document.getElementById("answer");
@@ -430,12 +431,13 @@
     answerTextArea.addEventListener('input', function () {
       this.value = this.value.toUpperCase();
     });
-    
+
     function handleBuzz() {
       // Kiểm tra cả lockedBuzz (global) và hasBuzzed (individual)
       if (lockedBuzz || hasBuzzed) return showPopup("Chuông đang khóa!", "error");
       // Không cần check btnBuzz.disabled vì updateBuzzUI đã đảm bảo
 
+      buzzSound.play().catch(e => console.log("Audio play error:", e));
       socket.emit("user-buzz", { roomCode: parseInt(myRoom), name: myName });
 
       // Khóa ngay lập tức trên client

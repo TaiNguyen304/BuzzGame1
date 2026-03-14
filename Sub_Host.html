@@ -483,6 +483,7 @@
         let buzzDuration_host = 0;
         let buzzEndTime_host = 0;
 
+        const buzzSound = new Audio('buzzer.mp3');
         const answerDurationInput = document.getElementById("answerDuration");
         const buzzDurationInput = document.getElementById("buzzDuration");
         const tblAnswersBody = document.querySelector("#tblAnswers tbody");
@@ -777,17 +778,24 @@
         // === [FIX LỖI CHUÔNG Ở ĐÂY] ===
         // Thêm listener cho update-buzz-list
         socket.on("update-buzz-list", (list) => {
-            buzzOrder = list;
-            renderBuzzList();
-            if (list.length > 0) {
+            // Kiểm tra nếu danh sách mới dài hơn danh sách hiện tại (có người mới bấm)
+            if (list.length > buzzOrder.length) {
+                buzzSound.play().catch(e => console.log("Audio play error:", e));
+
+                // Hiển thị thông báo người vừa bấm mới nhất
                 const lastBuzzer = list[list.length - 1].name;
                 showPopup(`🔔 ${lastBuzzer} vừa bấm chuông!`);
             }
+
+            buzzOrder = list;
+            renderBuzzList();
         });
 
-        // Vẫn giữ host-new-buzz cho Manual Add
-        socket.on("host-new-buzz", data => {
+        socket.on("host-new-buzz", (data) => {
+            // Kiểm tra nếu người này chưa có trong danh sách hiện tại
             if (!buzzOrder.find(b => b.name === data.name)) {
+                buzzSound.play().catch(e => console.log("Audio play error:", e));
+
                 buzzOrder.push(data);
                 renderBuzzList();
             }
@@ -866,8 +874,8 @@
             XLSX.writeFile(wb, `KQ_${currentRoom}.xlsx`);
         };
         document.addEventListener("contextmenu", function (e) {
-      e.preventDefault();
-    });
+            e.preventDefault();
+        });
     </script>
 </body>
 
