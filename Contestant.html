@@ -11,7 +11,7 @@
       text-align: center;
       padding: 20px;
       /* Ngăn chọn văn bản ở body để tránh click nhầm */
-      user-select: none; 
+      user-select: none;
     }
 
     input,
@@ -20,7 +20,8 @@
       margin: 5px;
       font-size: 16px;
       font-weight: bold;
-      user-select: text; /* Cho phép chọn text trong ô nhập */
+      user-select: text;
+      /* Cho phép chọn text trong ô nhập */
     }
 
     textarea {
@@ -30,6 +31,7 @@
       resize: none;
       margin-bottom: 10px;
       font-weight: bold;
+      text-transform: uppercase;
     }
 
     /* CLASS MỚI: Style cho trạng thái khóa (dùng readOnly) */
@@ -37,7 +39,8 @@
       background-color: #333 !important;
       color: #fff !important;
       border: 2px solid #000;
-      caret-color: transparent; /* Ẩn con trỏ chuột khi khóa */
+      caret-color: transparent;
+      /* Ẩn con trỏ chuột khi khóa */
       outline: none;
     }
 
@@ -55,7 +58,7 @@
       align-items: center;
       margin-top: 20px;
       /* Click vào vùng này sẽ auto focus nếu đang mở */
-      min-height: 300px; 
+      min-height: 300px;
     }
 
     #btnJoin {
@@ -175,7 +178,7 @@
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<script>
+  <script>
 
     const SOCKET_SERVER_URL = "https://buzzgame1-1.onrender.com";
     const socket = io(SOCKET_SERVER_URL, { autoConnect: true });
@@ -204,11 +207,11 @@
     function initLockedState() {
       btnSend.classList.add("locked");
       btnSend.disabled = true;
-      
+
       // Dùng readOnly và style riêng
       answerTextArea.readOnly = true;
       answerTextArea.classList.add("textarea-locked");
-      
+
       btnBuzz.classList.add("locked");
       btnBuzz.disabled = true;
     }
@@ -232,9 +235,9 @@
 
     // === HÀM FOCUS MẠNH MẼ ===
     function forceFocusIfOpen() {
-        if (!lockedAnswer) {
-            answerTextArea.focus();
-        }
+      if (!lockedAnswer) {
+        answerTextArea.focus();
+      }
     }
 
     function updateAnswerUI(isLocked) {
@@ -242,17 +245,17 @@
       if (isLocked) {
         btnSend.classList.add("locked");
         btnSend.disabled = true;
-        
+
         answerTextArea.readOnly = true;
         answerTextArea.classList.add("textarea-locked");
         answerTextArea.blur(); // Bỏ focus khi khóa
       } else {
         btnSend.classList.remove("locked");
         btnSend.disabled = false;
-        
+
         answerTextArea.readOnly = false;
         answerTextArea.classList.remove("textarea-locked");
-        
+
         // Focus ngay lập tức
         answerTextArea.focus();
       }
@@ -260,37 +263,37 @@
 
     // === NEW FUNCTION: Cập nhật trạng thái nút bấm chuông ===
     function updateBuzzUI(isGloballyLocked) {
-        lockedBuzz = isGloballyLocked;
-        // Nút bị khóa nếu: (1) Host/Timer khóa CHUNG HOẶC (2) Thí sinh đã bấm rồi (hasBuzzed)
-        const isButtonLocked = isGloballyLocked || hasBuzzed; 
+      lockedBuzz = isGloballyLocked;
+      // Nút bị khóa nếu: (1) Host/Timer khóa CHUNG HOẶC (2) Thí sinh đã bấm rồi (hasBuzzed)
+      const isButtonLocked = isGloballyLocked || hasBuzzed;
 
-        if (isButtonLocked) {
-            btnBuzz.classList.add("locked");
-            btnBuzz.disabled = true;
-        } else {
-            btnBuzz.classList.remove("locked");
-            btnBuzz.disabled = false;
-        }
+      if (isButtonLocked) {
+        btnBuzz.classList.add("locked");
+        btnBuzz.disabled = true;
+      } else {
+        btnBuzz.classList.remove("locked");
+        btnBuzz.disabled = false;
+      }
     }
-    
+
     // Bắt sự kiện keydown toàn trang
     document.addEventListener('keydown', (e) => {
-        // Nếu đang MỞ khóa đáp án
-        if (!lockedAnswer) {
-            // Và người dùng KHÔNG đang gõ trong ô nhập (ví dụ vừa click ra ngoài)
-            if (document.activeElement !== answerTextArea) {
-                // Focus lại ngay lập tức để nhận phím
-                answerTextArea.focus();
-            }
+      // Nếu đang MỞ khóa đáp án
+      if (!lockedAnswer) {
+        // Và người dùng KHÔNG đang gõ trong ô nhập (ví dụ vừa click ra ngoài)
+        if (document.activeElement !== answerTextArea) {
+          // Focus lại ngay lập tức để nhận phím
+          answerTextArea.focus();
         }
+      }
     });
-    
+
     // Bắt sự kiện click vào body để focus lại nếu lỡ click ra ngoài
     document.body.addEventListener('click', (e) => {
-        // Trừ khi click vào nút (để tránh loop click nút)
-        if(e.target.tagName !== 'BUTTON' && !lockedAnswer) {
-            answerTextArea.focus();
-        }
+      // Trừ khi click vào nút (để tránh loop click nút)
+      if (e.target.tagName !== 'BUTTON' && !lockedAnswer) {
+        answerTextArea.focus();
+      }
     });
 
 
@@ -325,13 +328,13 @@
       if (!startTime || duration <= 0) {
         document.getElementById("buzzCountdown").innerText = "--.--s";
         // Reset global lock state and update UI
-        updateBuzzUI(false); 
+        updateBuzzUI(false);
         return;
       }
 
       const end = Date.now() + (duration) * 1000;
       // Reset global lock state and update UI (button enabled only if !hasBuzzed)
-      updateBuzzUI(false); 
+      updateBuzzUI(false);
 
       buzzInterval = setInterval(() => {
         const remain = end - Date.now();
@@ -424,13 +427,17 @@
       }
     });
 
+    answerTextArea.addEventListener('input', function () {
+      this.value = this.value.toUpperCase();
+    });
+    
     function handleBuzz() {
       // Kiểm tra cả lockedBuzz (global) và hasBuzzed (individual)
-      if (lockedBuzz || hasBuzzed) return showPopup("Chuông đang khóa!", "error"); 
+      if (lockedBuzz || hasBuzzed) return showPopup("Chuông đang khóa!", "error");
       // Không cần check btnBuzz.disabled vì updateBuzzUI đã đảm bảo
 
       socket.emit("user-buzz", { roomCode: parseInt(myRoom), name: myName });
-      
+
       // Khóa ngay lập tức trên client
       hasBuzzed = true;
       updateBuzzUI(true);
@@ -451,7 +458,7 @@
     socket.on("force-lock-buzz", () => {
       // Cập nhật trạng thái đã bấm và khóa nút (server confirm)
       hasBuzzed = true;
-      updateBuzzUI(true); 
+      updateBuzzUI(true);
       showPopup("Đã bấm chuông!");
     });
 
@@ -466,10 +473,11 @@
       answerTextArea.value = "";
       showPopup("Đáp án đã được Host/Manager reset!");
     });
-    
+
     document.addEventListener("contextmenu", function (e) {
       e.preventDefault();
     });
   </script>
 </body>
+
 </html>
