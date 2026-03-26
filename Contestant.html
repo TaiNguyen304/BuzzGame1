@@ -435,14 +435,14 @@
     function handleBuzz() {
       // Kiểm tra cả lockedBuzz (global) và hasBuzzed (individual)
       if (lockedBuzz || hasBuzzed) return showPopup("Chuông đang khóa!", "error");
-      // Không cần check btnBuzz.disabled vì updateBuzzUI đã đảm bảo
 
       buzzSound.play().catch(e => console.log("Audio play error:", e));
       socket.emit("user-buzz", { roomCode: parseInt(myRoom), name: myName });
 
       // Khóa ngay lập tức trên client
       hasBuzzed = true;
-      updateBuzzUI(true);
+      // SỬA TẠI ĐÂY: Sử dụng lockedBuzz thay vì true để không ghi đè trạng thái của Host
+      updateBuzzUI(lockedBuzz);
       showPopup("Đã bấm!");
     }
 
@@ -460,15 +460,21 @@
     socket.on("force-lock-buzz", () => {
       // Cập nhật trạng thái đã bấm và khóa nút (server confirm)
       hasBuzzed = true;
-      updateBuzzUI(true);
+      // SỬA TẠI ĐÂY: Sử dụng lockedBuzz thay vì true
+      updateBuzzUI(lockedBuzz);
       showPopup("Đã bấm chuông!");
     });
 
-    socket.on("buzz-reset", () => {
-      // Reset trạng thái đã bấm và cập nhật UI (giữ nguyên lockedBuzz/global lock)
+    socket.on("buzz-reset", (data) => {
       hasBuzzed = false;
+
+      // Nếu server gửi kèm thông tin trạng thái, hãy cập nhật lại timer
+      if (data && data.status === "open") {
+        startBuzzCountdown(data.startTime, data.duration);
+      }
+
       updateBuzzUI(lockedBuzz);
-      showPopup("Chuông đã được Host/Manager reset!");
+      showPopup("Chuông đã được reset!");
     });
 
     socket.on("answers-reset", () => {
